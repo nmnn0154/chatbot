@@ -1,0 +1,218 @@
+import { useState, useEffect } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { getUserChatHistory } from '../lib/chatApi';
+import {
+  MessageSquare,
+  LayoutDashboard,
+  BookOpen,
+  History,
+  LogOut,
+  Menu,
+  X,
+  HelpCircle,
+} from 'lucide-react';
+
+export default function Layout({ children }) {
+  const { profile, isAdmin, signOut } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [recentChats, setRecentChats] = useState([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (profile?.id) {
+      getUserChatHistory(profile.id, 15).then(data => {
+        setRecentChats(data);
+      });
+    }
+  }, [profile?.id]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
+  const closeSidebar = () => setSidebarOpen(false);
+
+  const navLinks = [
+    { to: '/chat', icon: MessageSquare, label: 'แชท' },
+  ];
+
+  if (isAdmin) {
+    navLinks.push(
+      { to: '/admin', icon: LayoutDashboard, label: 'แดชบอร์ด', end: true },
+      { to: '/admin/knowledge-base', icon: BookOpen, label: 'ฐานความรู้' },
+      { to: '/admin/faqs', icon: HelpCircle, label: 'จัดการ FAQ' }
+    );
+  }
+
+  const userInitial = profile?.full_name?.charAt(0) || 'U';
+
+  return (
+    <div className="app-layout">
+      {/* Mobile overlay */}
+      <div
+        className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`}
+        onClick={closeSidebar}
+      />
+
+      {/* Sidebar */}
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <div className="sidebar-logo">กยศ.</div>
+          <div className="sidebar-brand">
+            <h1>กยศ. Chatbot</h1>
+            <p>มทร.ศรีวิชัย</p>
+          </div>
+          <button
+            className="btn btn-ghost btn-icon"
+            onClick={closeSidebar}
+            style={{ display: sidebarOpen ? 'flex' : 'none' }}
+            aria-label="ปิดเมนู"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <nav className="sidebar-nav">
+          {isAdmin && (
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', padding: '0.5rem 0.75rem', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              ผู้ใช้
+            </div>
+          )}
+          <NavLink
+            to="/chat"
+            className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+            onClick={closeSidebar}
+          >
+            <MessageSquare size={20} />
+            แชท
+          </NavLink>
+          {!isAdmin && (
+            <NavLink
+              to="/faqs"
+              className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+              onClick={closeSidebar}
+            >
+              <HelpCircle size={20} />
+              คำถามที่พบบ่อย (FAQ)
+            </NavLink>
+          )}
+
+          {isAdmin && (
+            <>
+              <div className="sidebar-divider" />
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', padding: '0.5rem 0.75rem', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                ผู้ดูแลระบบ
+              </div>
+              <NavLink
+                to="/admin"
+                end
+                className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+                onClick={closeSidebar}
+              >
+                <LayoutDashboard size={20} />
+                แดชบอร์ด
+              </NavLink>
+              <NavLink
+                to="/admin/knowledge-base"
+                className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+                onClick={closeSidebar}
+              >
+                <BookOpen size={20} />
+                ฐานความรู้
+              </NavLink>
+              <NavLink
+                to="/admin/faqs"
+                className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+                onClick={closeSidebar}
+              >
+                <HelpCircle size={20} />
+                จัดการ FAQ
+              </NavLink>
+            </>
+          )}
+
+          {/* User History Section */}
+          {!isAdmin && recentChats.length > 0 && (
+            <>
+              <div className="sidebar-divider" />
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', padding: '0.5rem 0.75rem', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                หัวข้อที่เคยคุย
+              </div>
+              <div className="sidebar-history-list" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {recentChats.map(chat => (
+                  <NavLink
+                    key={chat.id}
+                    to={`/chat?id=${chat.id}`}
+                    className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+                    onClick={closeSidebar}
+                    style={{ padding: '0.4rem 0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    <History size={16} />
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {chat.user_message.length > 25 ? chat.user_message.substring(0, 25) + '...' : chat.user_message}
+                    </span>
+                  </NavLink>
+                ))}
+              </div>
+            </>
+          )}
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="sidebar-user">
+            <div className="sidebar-avatar">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt={profile.full_name} referrerPolicy="no-referrer" />
+              ) : (
+                userInitial
+              )}
+            </div>
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">{profile?.full_name || 'ผู้ใช้'}</div>
+              <div className="sidebar-user-role">
+                {isAdmin ? '👑 ผู้ดูแลระบบ' : '👤 ผู้ใช้'}
+              </div>
+            </div>
+            <button
+              className="btn btn-ghost btn-icon"
+              onClick={handleSignOut}
+              title="ออกจากระบบ"
+              aria-label="ออกจากระบบ"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile Topbar */}
+      <div className="topbar">
+        <button
+          className="btn btn-ghost btn-icon"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="เปิดเมนู"
+        >
+          <Menu size={22} />
+        </button>
+        <div className="topbar-brand">
+          <div className="topbar-logo">กยศ.</div>
+          <span className="topbar-title">กยศ. Chatbot</span>
+        </div>
+        <button
+          className="btn btn-ghost btn-icon"
+          onClick={handleSignOut}
+          aria-label="ออกจากระบบ"
+        >
+          <LogOut size={20} />
+        </button>
+      </div>
+
+      {/* Main Content */}
+      <main className="main-content">
+        {children}
+      </main>
+    </div>
+  );
+}
