@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { sendChatMessage, getChatById } from '../lib/chatApi';
-import { Send, AlertTriangle, Bot, Sparkles } from 'lucide-react';
+import { sendChatMessage, getChatById, rateChatResponse } from '../lib/chatApi';
+import { Send, AlertTriangle, Bot, Sparkles, Star } from 'lucide-react';
 
 const SUGGESTIONS = [
   'คุณสมบัติผู้กู้ กยศ. มีอะไรบ้าง?',
@@ -18,6 +18,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [ratings, setRatings] = useState({}); // Track local ratings by historyId
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const location = useLocation();
@@ -26,10 +27,10 @@ export default function ChatPage() {
   const chatId = queryParams.get('id');
 
   useEffect(() => {
-    async function loadChat() {
+    function loadChat() {
       if (chatId) {
-        const chat = await getChatById(chatId);
-        if (chat && chat.user_id === user?.id) {
+        const chat = getChatById(chatId, user?.id);
+        if (chat) {
           setMessages([
             {
               id: chat.id + '_u',
@@ -42,8 +43,12 @@ export default function ChatPage() {
               type: 'bot',
               text: chat.bot_response,
               time: chat.created_at,
+              historyId: chat.id,
             }
           ]);
+          if (chat.rating) {
+            setRatings(prev => ({ ...prev, [chat.id]: chat.rating }));
+          }
         }
       } else {
         setMessages([]);
@@ -76,12 +81,13 @@ export default function ChatPage() {
     setIsTyping(true);
 
     try {
-      const response = await sendChatMessage(text, user?.id);
+      const { text: responseText, id: historyId } = await sendChatMessage(text, user?.id);
       const botMessage = {
-        id: Date.now() + 1,
+        id: historyId || Date.now() + 1,
         type: 'bot',
-        text: response,
+        text: responseText,
         time: new Date(),
+        historyId: historyId, // Store historyId to rate it later
       };
       setMessages((prev) => [...prev, botMessage]);
       // If we are looking at a history item, submitting a new message should perhaps clear the history ID from URL
@@ -110,6 +116,24 @@ export default function ChatPage() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const handleRate = async (historyId, rating) => {
+    if (!historyId) return;
+    
+    // Optimistic UI update
+    setRatings(prev => ({ ...prev, [historyId]: rating }));
+    
+    const success = await rateChatResponse(historyId, rating, user?.id);
+    if (!success) {
+      // Revert on failure
+      setRatings(prev => {
+        const next = { ...prev };
+        delete next[historyId];
+        return next;
+      });
+      alert('ขออภัย ไม่สามารถบันทึกคะแนนได้');
     }
   };
 
@@ -199,7 +223,66 @@ export default function ChatPage() {
                   }} />
                 ))}
               </div>
-              <div className="message-time">{formatTime(msg.time)}</div>
+              <div className="message-time" style={{ marginTop: '4px' }}>{formatTime(msg.time)}</div>
+              
+              {msg.type === 'bot' && msg.historyId && (
+                <div 
+                  className="rating-container" 
+                  style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    marginTop: '16px',
+                    padding: '12px',
+                    background: 'var(--color-bg-hover)',
+                    borderRadius: '12px',
+                    border: '1px solid var(--color-border)',
+                    width: 'fit-content',
+                    margin: '16px auto 0' // Center it below the bubble
+                  }}
+                >
+                  <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
+                    คุณพึงพอใจกับคำตอบนี้หรือไม่?
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button
+                        key={star}
+                        onClick={() => handleRate(msg.historyId, star)}
+                        disabled={ratings[msg.historyId] !== undefined}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: ratings[msg.historyId] !== undefined ? 'default' : 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          color: (ratings[msg.historyId] >= star) ? 'var(--color-warning)' : 'var(--color-text-muted)',
+                          transition: 'all 0.2s ease',
+                          opacity: (ratings[msg.historyId] !== undefined && ratings[msg.historyId] < star) ? 0.3 : 1,
+                          transform: (ratings[msg.historyId] >= star) ? 'scale(1.1)' : 'scale(1)'
+                        }}
+                        title={`ให้ ${star} ดาว`}
+                        onMouseEnter={(e) => {
+                          if (ratings[msg.historyId] === undefined) {
+                            e.currentTarget.style.transform = 'scale(1.2)';
+                            e.currentTarget.style.color = 'var(--color-warning)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (ratings[msg.historyId] === undefined) {
+                            e.currentTarget.style.transform = 'scale(1)';
+                            e.currentTarget.style.color = 'var(--color-text-muted)';
+                          }
+                        }}
+                      >
+                        <Star size={24} fill={(ratings[msg.historyId] >= star) ? 'currentColor' : 'none'} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ))}

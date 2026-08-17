@@ -104,34 +104,136 @@ export async function sendChatMessage(message, userId) {
       }
     }
 
-    // Step 3: Save chat history
-    if (userId) {
-      await saveChatHistory(userId, message, botResponse);
+    // Step 3: Save chat history (anonymous - no user data stored in DB)
+    let historyId = null;
+    const saved = await saveChatHistory(message, botResponse);
+    if (saved) {
+      historyId = saved.id;
+      // Step 4: Save to Local Storage (per-user key for separation)
+      saveChatToLocal(userId, {
+        id: saved.id,
+        user_message: saved.user_message,
+        bot_response: saved.bot_response,
+        created_at: saved.created_at,
+        rating: null
+      });
+      // Dispatch event to update Sidebar
+      window.dispatchEvent(new Event('chatHistoryUpdated'));
     }
 
-    return botResponse;
+    return { text: botResponse, id: historyId };
   } catch (error) {
     console.error('Chat error:', error);
-    return 'ขออภัยครับ เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง หรือติดต่อเจ้าหน้าที่โดยตรง';
+    return { text: 'ขออภัยครับ เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง หรือติดต่อเจ้าหน้าที่โดยตรง', id: null };
   }
 }
 
 /**
- * Save chat history to Supabase
+ * Save chat history to Supabase (Always anonymous - no user data stored)
  */
-async function saveChatHistory(userId, userMessage, botResponse) {
+async function saveChatHistory(userMessage, botResponse) {
   try {
-    const { error } = await supabase.from('chat_histories').insert({
-      user_id: userId,
+    const { data, error } = await supabase.from('chat_histories').insert({
+      user_id: null,
       user_message: userMessage,
       bot_response: botResponse,
-    });
+    }).select().single();
 
     if (error) {
       console.error('Failed to save chat history:', error);
+      return null;
     }
+    return data;
   } catch (error) {
     console.error('Save chat history error:', error);
+    return null;
+  }
+}
+
+/**
+ * Rate a chatbot response (1-5 stars)
+ */
+export async function rateChatResponse(historyId, rating, userId = null) {
+  if (!historyId || !rating) return false;
+  
+  try {
+    const { error } = await supabase
+      .from('chat_histories')
+      .update({ rating })
+      .eq('id', historyId);
+      
+    if (error) throw error;
+    
+    // Update local storage rating
+    updateLocalChatRating(historyId, rating, userId);
+    
+    return true;
+  } catch (error) {
+    console.error('Failed to rate chat response:', error);
+    return false;
+  }
+}
+
+// ==========================================
+// LOCAL STORAGE MANAGEMENT (Per-User Separation)
+// ==========================================
+
+const LOCAL_STORAGE_BASE = 'kku_chatbot_history';
+
+/**
+ * Get localStorage key unique to each user
+ */
+function getStorageKey(userId) {
+  return userId ? `${LOCAL_STORAGE_BASE}_${userId}` : LOCAL_STORAGE_BASE;
+}
+
+/**
+ * Get chat history from localStorage (separated per user)
+ */
+export function getChatHistory(userId = null) {
+  try {
+    const key = getStorageKey(userId);
+    const data = localStorage.getItem(key);
+    if (data) {
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.error('Failed to read local chat history', err);
+  }
+  return [];
+}
+
+/**
+ * Get specific chat by ID from localStorage
+ */
+export function getChatById(id, userId = null) {
+  const history = getChatHistory(userId);
+  return history.find(chat => chat.id === id) || null;
+}
+
+/**
+ * Save a chat item to localStorage (per-user key)
+ */
+export function saveChatToLocal(userId, chatItem) {
+  const key = getStorageKey(userId);
+  const history = getChatHistory(userId);
+  history.unshift(chatItem);
+  if (history.length > 30) history.length = 30;
+  localStorage.setItem(key, JSON.stringify(history));
+}
+
+export function getLocalChatById(id) {
+  // Fallback for legacy usage
+  return getChatById(id, null);
+}
+
+export function updateLocalChatRating(id, rating, userId = null) {
+  const key = getStorageKey(userId);
+  const history = getChatHistory(userId);
+  const chatIndex = history.findIndex(chat => chat.id === id);
+  if (chatIndex !== -1) {
+    history[chatIndex].rating = rating;
+    localStorage.setItem(key, JSON.stringify(history));
   }
 }
 
@@ -258,39 +360,4 @@ export async function getChatHistories(page = 1, pageSize = 20) {
   return { data: chatData, count };
 }
 
-/**
- * Get chat history for a specific user
- */
-export async function getUserChatHistory(userId, limit = 20) {
-  if (!userId) return [];
-  const { data, error } = await supabase
-    .from('chat_histories')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(limit);
 
-  if (error) {
-    console.error('Failed to get user chat history:', error);
-    return [];
-  }
-  return data;
-}
-
-/**
- * Get a specific chat history by ID
- */
-export async function getChatById(id) {
-  if (!id) return null;
-  const { data, error } = await supabase
-    .from('chat_histories')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    console.error('Failed to get chat by id:', error);
-    return null;
-  }
-  return data;
-}

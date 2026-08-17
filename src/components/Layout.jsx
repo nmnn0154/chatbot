@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserChatHistory } from '../lib/chatApi';
+import { getChatHistory } from '../lib/chatApi';
 import {
   MessageSquare,
   LayoutDashboard,
@@ -11,21 +11,31 @@ import {
   Menu,
   X,
   HelpCircle,
+  Megaphone,
 } from 'lucide-react';
 
 export default function Layout({ children }) {
-  const { profile, isAdmin, signOut } = useAuth();
+  const { profile, isAdmin, signOut, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [recentChats, setRecentChats] = useState([]);
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const currentChatId = searchParams.get('id');
 
   useEffect(() => {
-    if (profile?.id) {
-      getUserChatHistory(profile.id, 15).then(data => {
-        setRecentChats(data);
-      });
-    }
-  }, [profile?.id]);
+    if (loading) return; // Wait until auth state is resolved
+
+    const loadHistory = () => {
+      const history = getChatHistory(profile?.id);
+      setRecentChats(history);
+    };
+    
+    loadHistory();
+    
+    window.addEventListener('chatHistoryUpdated', loadHistory);
+    return () => window.removeEventListener('chatHistoryUpdated', loadHistory);
+  }, [profile?.id, loading]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -82,22 +92,28 @@ export default function Layout({ children }) {
           )}
           <NavLink
             to="/chat"
-            className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+            className={({ isActive }) => `sidebar-nav-link ${isActive && !currentChatId ? 'active' : ''}`}
             onClick={closeSidebar}
           >
             <MessageSquare size={20} />
-            แชท
+            แชทใหม่
           </NavLink>
-          {!isAdmin && (
-            <NavLink
-              to="/faqs"
-              className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
-              onClick={closeSidebar}
-            >
-              <HelpCircle size={20} />
-              คำถามที่พบบ่อย (FAQ)
-            </NavLink>
-          )}
+          <NavLink
+            to="/faqs"
+            className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+            onClick={closeSidebar}
+          >
+            <HelpCircle size={20} />
+            คำถามที่พบบ่อย (FAQ)
+          </NavLink>
+          <NavLink
+            to="/news"
+            className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+            onClick={closeSidebar}
+          >
+            <Megaphone size={20} />
+            ข่าวสาร (มุมมองผู้ใช้)
+          </NavLink>
 
           {isAdmin && (
             <>
@@ -130,11 +146,19 @@ export default function Layout({ children }) {
                 <HelpCircle size={20} />
                 จัดการ FAQ
               </NavLink>
+              <NavLink
+                to="/admin/news"
+                className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+                onClick={closeSidebar}
+              >
+                <Megaphone size={20} />
+                จัดการข่าวสาร
+              </NavLink>
             </>
           )}
 
           {/* User History Section */}
-          {!isAdmin && recentChats.length > 0 && (
+          {recentChats.length > 0 && (
             <>
               <div className="sidebar-divider" />
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', padding: '0.5rem 0.75rem', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
@@ -142,18 +166,18 @@ export default function Layout({ children }) {
               </div>
               <div className="sidebar-history-list" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {recentChats.map(chat => (
-                  <NavLink
+                  <Link
                     key={chat.id}
                     to={`/chat?id=${chat.id}`}
-                    className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+                    className={`sidebar-nav-link ${currentChatId === chat.id ? 'active' : ''}`}
                     onClick={closeSidebar}
-                    style={{ padding: '0.4rem 0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}
+                    style={{ padding: '0.4rem 0.75rem', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '8px' }}
                   >
                     <History size={16} />
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {chat.user_message.length > 25 ? chat.user_message.substring(0, 25) + '...' : chat.user_message}
                     </span>
-                  </NavLink>
+                  </Link>
                 ))}
               </div>
             </>

@@ -19,6 +19,7 @@ export default function AdminDashboard() {
     totalChats: 0,
     totalUsers: 0,
     todayChats: 0,
+    avgRating: 0,
   });
   const [frequentQuestions, setFrequentQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,35 +56,53 @@ export default function AdminDashboard() {
         .select('*', { count: 'exact', head: true })
         .gte('created_at', today.toISOString());
 
-      // Get messages for frequency analysis inside Insights
+      // Get messages and ratings for frequency analysis inside Insights
       const { data: historyData } = await supabase
         .from('chat_histories')
-        .select('user_message, bot_response')
+        .select('user_message, bot_response, rating')
         .order('created_at', { ascending: false })
         .limit(500);
 
       const freq = {};
+      let totalRatingSum = 0;
+      let totalRatedMessages = 0;
+
       if (historyData) {
         historyData.forEach(chat => {
+          if (chat.rating) {
+            totalRatingSum += chat.rating;
+            totalRatedMessages++;
+          }
           if (chat.user_message) {
             const msg = chat.user_message.trim();
             if (msg) {
               if (!freq[msg]) {
-                 freq[msg] = { count: 0, latest_answer: chat.bot_response };
+                 freq[msg] = { count: 0, latest_answer: chat.bot_response, ratingSum: 0, ratedCount: 0 };
               }
               freq[msg].count += 1;
+              if (chat.rating) {
+                freq[msg].ratingSum += chat.rating;
+                freq[msg].ratedCount += 1;
+              }
             }
           }
         });
       }
       
+      const overallAvgRating = totalRatedMessages > 0 ? (totalRatingSum / totalRatedMessages).toFixed(1) : 0;
+
       const topQuestions = Object.keys(freq)
-        .map((msg, index) => ({ 
-            id: index, 
-            user_message: msg, 
-            count: freq[msg].count, 
-            bot_response: freq[msg].latest_answer 
-        }))
+        .map((msg, index) => {
+            const item = freq[msg];
+            const avgQ = item.ratedCount > 0 ? (item.ratingSum / item.ratedCount).toFixed(1) : null;
+            return { 
+              id: index, 
+              user_message: msg, 
+              count: item.count, 
+              bot_response: item.latest_answer,
+              avgRating: avgQ
+            };
+        })
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 
@@ -92,6 +111,7 @@ export default function AdminDashboard() {
         totalChats: chatCount || 0,
         totalUsers: userCount || 0,
         todayChats: todayCount || 0,
+        avgRating: overallAvgRating,
       });
 
       setFrequentQuestions(topQuestions);
@@ -168,6 +188,16 @@ export default function AdminDashboard() {
             <p>แชทวันนี้</p>
           </div>
         </div>
+
+        <div className="card card-glow stat-card">
+          <div className="stat-icon stat-icon-emerald" style={{ color: 'var(--color-warning)' }}>
+            <span style={{ fontSize: '1.5rem' }}>★</span>
+          </div>
+          <div className="stat-content">
+            <h3>{stats.avgRating > 0 ? stats.avgRating : '-'}</h3>
+            <p>คะแนนความพึงพอใจ</p>
+          </div>
+        </div>
       </div>
 
       {/* Quick Actions */}
@@ -203,6 +233,11 @@ export default function AdminDashboard() {
                       "{q.user_message}"
                     </p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {q.avgRating && (
+                        <div style={{ background: 'var(--color-bg-primary)', padding: '2px 8px', borderRadius: '12px', fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--color-warning)' }}>
+                          ★ {q.avgRating}
+                        </div>
+                      )}
                       <div style={{ background: 'var(--color-bg-primary)', padding: '2px 8px', borderRadius: '12px', fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--color-brand)' }}>
                         ถาม {q.count} ครั้ง
                       </div>

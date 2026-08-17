@@ -7,8 +7,10 @@ import ChatPage from './pages/ChatPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import KnowledgeBase from './pages/admin/KnowledgeBase';
 import AdminFaq from './pages/admin/AdminFaq';
+import AdminNews from './pages/admin/AdminNews';
 import NotFoundPage from './pages/NotFoundPage';
 import FAQPage from './pages/FAQPage';
+import NewsPage from './pages/NewsPage';
 
 function App() {
   return (
@@ -35,6 +37,17 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <FAQPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/news"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <NewsPage />
                 </Layout>
               </ProtectedRoute>
             }
@@ -67,6 +80,17 @@ function App() {
               <ProtectedRoute requireAdmin>
                 <Layout>
                   <AdminFaq />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/news"
+            element={
+              <ProtectedRoute requireAdmin>
+                <Layout>
+                  <AdminNews />
                 </Layout>
               </ProtectedRoute>
             }
