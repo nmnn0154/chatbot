@@ -1,6 +1,31 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
+ * In-memory rate limiting map for basic protection
+ * Key: IP, Value: { count, resetTime }
+ */
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 30; // Max 30 requests per minute per IP
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip);
+
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    return true;
+  }
+
+  record.count += 1;
+  return false;
+}
+
+/**
  * Vercel Serverless Function to handle Gemini API Proxy in Production
  * Deployed automatically on Vercel at /api/chat
  */
@@ -10,8 +35,25 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Basic IP Rate Limiting
+  const clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+  if (isRateLimited(clientIp)) {
+    return res.status(429).json({ 
+      error: 'คุณส่งข้อความเร็วเกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง' 
+    });
+  }
+
   try {
-    const { message, context } = req.body;
+    const { message, context } = req.body || {};
+
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      return res.status(400).json({ error: 'Message is required and must be a non-empty string' });
+    }
+
+    if (message.length > 2000) {
+      return res.status(400).json({ error: 'Message is too long (maximum 2,000 characters)' });
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
@@ -21,7 +63,7 @@ export default async function handler(req, res) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // We use gemini-3.5-flash as it is fast and supports system instructions
+    // Use gemini-3.5-flash as standard official model
     const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     let systemPrompt = `คุณคือผู้ช่วย AI ชื่อ "กยศ. Chatbot" ของ มทร.ศรีวิชัย
@@ -34,15 +76,17 @@ export default async function handler(req, res) {
 
 ข้อมูลอ้างอิงจากเอกสาร:\n`;
     
-    if (context && context.length > 0) {
+    if (context && Array.isArray(context) && context.length > 0) {
       context.forEach((c, idx) => {
-        systemPrompt += `[ส่วนที่ ${idx + 1}]:\n${c.answer}\n\n`;
+        if (c?.answer) {
+          systemPrompt += `[ส่วนที่ ${idx + 1}]:\n${c.answer}\n\n`;
+        }
       });
     }
 
     // Call Gemini API
     const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: message }] }],
+      contents: [{ role: 'user', parts: [{ text: message.trim() }] }],
       systemInstruction: systemPrompt,
     });
 
@@ -51,6 +95,12 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Gemini API Error in Serverless Function:', error);
+    const errStr = String(error?.message || error);
+    if (errStr.includes('429') || errStr.includes('quota') || errStr.includes('RESOURCE_EXHAUSTED')) {
+      return res.status(429).json({ 
+        error: 'โควต้า API รายวันหมดชั่วคราว กรุณาลองใหม่อีกครั้งในภายหลัง' 
+      });
+    }
     return res.status(500).json({ error: 'Failed to generate response' });
   }
 }

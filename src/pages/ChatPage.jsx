@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { sendChatMessage, getChatById, rateChatResponse } from '../lib/chatApi';
 import { Send, AlertTriangle, Bot, Sparkles, Star } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 const SUGGESTIONS = [
   'คุณสมบัติผู้กู้ กยศ. มีอะไรบ้าง?',
@@ -144,19 +145,7 @@ export default function ChatPage() {
     });
   };
 
-  const formatBotText = (text) => {
-    // Simple markdown-like formatting
-    return text
-      .split('\n')
-      .map((line, i) => {
-        // Bold text
-        line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        // Italic
-        line = line.replace(/\*(.*?)\*/g, '<em>$1</em>');
-        return line;
-      })
-      .join('\n');
-  };
+
 
   const userInitial = profile?.full_name?.charAt(0) || 'U';
 
@@ -214,14 +203,13 @@ export default function ChatPage() {
             </div>
             <div>
               <div className="message-bubble">
-                {msg.text.split('\n').map((line, i) => (
-                  <p key={i} dangerouslySetInnerHTML={{
-                    __html: line
-                      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                      || '&nbsp;'
-                  }} />
-                ))}
+                {msg.text.split('\n').map((line, i) => {
+                  const formatted = line
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>');
+                  const cleanHtml = DOMPurify.sanitize(formatted) || '&nbsp;';
+                  return <p key={i} dangerouslySetInnerHTML={{ __html: cleanHtml }} />;
+                })}
               </div>
               <div className="message-time" style={{ marginTop: '4px' }}>{formatTime(msg.time)}</div>
               
@@ -251,6 +239,7 @@ export default function ChatPage() {
                         key={star}
                         onClick={() => handleRate(msg.historyId, star)}
                         disabled={ratings[msg.historyId] !== undefined}
+                        aria-label={`ให้คะแนน ${star} ดาว`}
                         style={{
                           background: 'none',
                           border: 'none',
@@ -318,6 +307,7 @@ export default function ChatPage() {
             rows={1}
             disabled={isTyping}
             id="chat-input"
+            aria-label="พิมพ์คำถามเกี่ยวกับ กยศ."
           />
           <button
             type="submit"

@@ -44,18 +44,6 @@ export default function Layout({ children }) {
 
   const closeSidebar = () => setSidebarOpen(false);
 
-  const navLinks = [
-    { to: '/chat', icon: MessageSquare, label: 'แชท' },
-  ];
-
-  if (isAdmin) {
-    navLinks.push(
-      { to: '/admin', icon: LayoutDashboard, label: 'แดชบอร์ด', end: true },
-      { to: '/admin/knowledge-base', icon: BookOpen, label: 'ฐานความรู้' },
-      { to: '/admin/faqs', icon: HelpCircle, label: 'จัดการ FAQ' }
-    );
-  }
-
   const userInitial = profile?.full_name?.charAt(0) || 'U';
 
   return (
@@ -112,7 +100,7 @@ export default function Layout({ children }) {
             onClick={closeSidebar}
           >
             <Megaphone size={20} />
-            ข่าวสาร (มุมมองผู้ใช้)
+            ข่าวสารและประกาศ
           </NavLink>
 
           {isAdmin && (

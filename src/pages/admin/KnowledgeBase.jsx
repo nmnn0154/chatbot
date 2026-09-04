@@ -323,6 +323,9 @@ function UploadModal({ userId, onSuccess, onClose }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div
                 className="upload-dropzone"
+                tabIndex={0}
+                role="button"
+                aria-label="คลิกหรือกด Enter เพื่อเลือกไฟล์ PDF"
                 style={{
                   border: '2px dashed var(--color-border)',
                   padding: '2rem',
@@ -332,6 +335,12 @@ function UploadModal({ userId, onSuccess, onClose }) {
                   backgroundColor: 'var(--color-bg-alt)'
                 }}
                 onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
               >
                 <Upload size={32} style={{ marginBottom: '8px', color: 'var(--color-text-muted)' }} />
                 <p style={{ fontWeight: 500, margin: '8px 0' }}>คลิกเพื่อเลือกไฟล์ PDF</p>

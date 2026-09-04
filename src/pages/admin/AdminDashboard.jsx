@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { getFaqs } from '../../lib/faqApi';
 import {
   BookOpen,
   MessageSquare,

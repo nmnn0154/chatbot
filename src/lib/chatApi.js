@@ -96,7 +96,6 @@ export async function sendChatMessage(message, userId) {
         const diffMs = midnight - now;
         const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
         const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        const resetTime = midnight.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
         const resetDate = midnight.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
         botResponse = `⚠️ **โควต้า API รายวันหมดแล้วครับ** (Free Tier จำกัด 20 ครั้ง/วัน)\n\n🕐 จะใช้งานได้อีกครั้งใน **${diffHrs} ชั่วโมง ${diffMins} นาที** (ประมาณเที่ยงคืนวันที่ ${resetDate})\n\nหากต้องการสอบถามข้อมูลเร่งด่วน กรุณาติดต่อกองพัฒนานักศึกษา มทร.ศรีวิชัย หรือ กยศ. Call Center **0-2016-4888** ครับ`;
       } else {
@@ -178,7 +177,8 @@ export async function rateChatResponse(historyId, rating, userId = null) {
 // LOCAL STORAGE MANAGEMENT (Per-User Separation)
 // ==========================================
 
-const LOCAL_STORAGE_BASE = 'kku_chatbot_history';
+const LOCAL_STORAGE_BASE = 'rmutsv_chatbot_history';
+const LEGACY_STORAGE_BASE = 'kku_chatbot_history';
 
 /**
  * Get localStorage key unique to each user
@@ -193,7 +193,11 @@ function getStorageKey(userId) {
 export function getChatHistory(userId = null) {
   try {
     const key = getStorageKey(userId);
-    const data = localStorage.getItem(key);
+    let data = localStorage.getItem(key);
+    // Legacy fallback migration
+    if (!data && !userId) {
+      data = localStorage.getItem(LEGACY_STORAGE_BASE);
+    }
     if (data) {
       return JSON.parse(data);
     }

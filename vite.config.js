@@ -20,11 +20,19 @@ const chatPlugin = () => ({
 
       req.on('end', async () => {
         try {
-          const { message, context } = JSON.parse(body);
+          const { message, context } = JSON.parse(body || '{}');
+
+          if (!message || typeof message !== 'string' || message.trim().length === 0) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'Message is required' }));
+          }
+
           const apiKey = process.env.GEMINI_API_KEY;
 
           if (!apiKey) {
             res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
             return res.end(JSON.stringify({ error: 'Gemini API key missing' }));
           }
 
@@ -40,14 +48,16 @@ const chatPlugin = () => ({
 ตอบด้วยภาษาที่สุภาพ เป็นคำแนะนำที่ชัดเจน และจัดรูปแบบด้วย markdown (เช่น ใช้ bullet points หรือตัวหนา) เพื่อให้อ่านง่าย
 
 เนื้อหาอ้างอิงจากเอกสาร:\n`;
-          if (context && context.length > 0) {
+          if (context && Array.isArray(context) && context.length > 0) {
             context.forEach((c, idx) => {
-              systemPrompt += `[ส่วนที่ ${idx + 1}]:\n${c.answer}\n\n`;
+              if (c?.answer) {
+                systemPrompt += `[ส่วนที่ ${idx + 1}]:\n${c.answer}\n\n`;
+              }
             });
           }
 
           const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: message }] }],
+            contents: [{ role: 'user', parts: [{ text: message.trim() }] }],
             systemInstruction: systemPrompt,
           });
 
@@ -59,9 +69,10 @@ const chatPlugin = () => ({
         } catch (error) {
           console.error('[Gemini Chat API Proxy Error]:', error.message || error);
           res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
           let errorMsg = 'Failed to generate response';
           const errStr = String(error.message || error);
-          if (errStr.includes('429') || errStr.includes('quota') || errStr.includes('Too Many Requests')) {
+          if (errStr.includes('429') || errStr.includes('quota') || errStr.includes('RESOURCE_EXHAUSTED')) {
             errorMsg = 'โควต้า API หมดแล้วครับ (Free Tier จำกัด 20 requests/วัน) กรุณารอวันถัดไป หรืออัปเกรดแผน API';
             res.statusCode = 429;
           }
@@ -81,27 +92,31 @@ const chatPlugin = () => ({
 
       req.on('end', async () => {
         try {
-          const { texts } = JSON.parse(body);
-          const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+          const { texts } = JSON.parse(body || '{}');
+          const apiKey = process.env.GEMINI_API_KEY;
 
           if (!apiKey) {
             res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
             return res.end(JSON.stringify({ error: 'Gemini API key missing' }));
           }
 
-          if (!texts || !Array.isArray(texts)) {
+          if (!texts || !Array.isArray(texts) || texts.length === 0) {
             res.statusCode = 400;
-            return res.end(JSON.stringify({ error: 'texts must be an array of strings' }));
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'texts must be a non-empty array of strings' }));
           }
 
           const genAI = new GoogleGenerativeAI(apiKey);
-          const model = genAI.getGenerativeModel({ model: 'gemini-embedding-2' });
+          const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
 
-          const embeddings = [];
-          for (const text of texts) {
-            const result = await model.embedContent(text);
-            embeddings.push(result.embedding.values);
-          }
+          const embeddingPromises = texts.map(async (text) => {
+            const sanitized = String(text || '').slice(0, 4000);
+            const result = await model.embedContent(sanitized);
+            return result.embedding.values;
+          });
+
+          const embeddings = await Promise.all(embeddingPromises);
 
           res.setHeader('Content-Type', 'application/json');
           res.statusCode = 200;
@@ -110,6 +125,7 @@ const chatPlugin = () => ({
         } catch (error) {
           console.error('[Gemini Embed API Proxy Error]:', error);
           res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ error: 'Failed to generate embeddings' }));
         }
       });
@@ -121,6 +137,5 @@ export default defineConfig({
   plugins: [react(), chatPlugin()],
   server: {
     port: 5173,
-    // We remove the standard proxy here because the chatPlugin handles it directly
   }
 });

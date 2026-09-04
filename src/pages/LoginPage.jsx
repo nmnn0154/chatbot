@@ -1,9 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const { user, signInWithGoogle, loading } = useAuth();
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -13,10 +16,14 @@ export default function LoginPage() {
   }, [user, loading, navigate]);
 
   const handleGoogleLogin = async () => {
+    setErrorMsg('');
+    setIsLoggingIn(true);
     try {
       await signInWithGoogle();
     } catch (error) {
       console.error('Login failed:', error);
+      setErrorMsg(error?.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google กรุณาลองใหม่อีกครั้ง');
+      setIsLoggingIn(false);
     }
   };
 
@@ -51,10 +58,31 @@ export default function LoginPage() {
           มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย
         </p>
 
+        {errorMsg && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'rgba(225, 29, 72, 0.1)',
+            border: '1px solid rgba(225, 29, 72, 0.3)',
+            borderRadius: 'var(--radius-md)',
+            padding: '10px 14px',
+            color: 'var(--color-brand-rose)',
+            fontSize: 'var(--text-sm)',
+            marginBottom: '16px',
+            textAlign: 'left'
+          }}>
+            <AlertCircle size={18} style={{ flexShrink: 0 }} />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
         <button
           className="google-btn"
           onClick={handleGoogleLogin}
+          disabled={isLoggingIn}
           id="google-login-btn"
+          aria-label="เข้าสู่ระบบด้วย Google"
         >
           <svg viewBox="0 0 24 24">
             <path
@@ -74,7 +102,7 @@ export default function LoginPage() {
               fill="#EA4335"
             />
           </svg>
-          เข้าสู่ระบบด้วย Google
+          {isLoggingIn ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบด้วย Google'}
         </button>
 
         <div className="login-footer">

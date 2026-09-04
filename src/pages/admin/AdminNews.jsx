@@ -224,6 +224,8 @@ export default function AdminNews() {
                         className={`badge ${news.is_published ? 'badge-emerald' : 'badge-amber'}`}
                         style={{ cursor: 'pointer', border: 'none' }}
                         title="คลิกเพื่อเปลี่ยนสถานะ"
+                        aria-pressed={news.is_published}
+                        aria-label={news.is_published ? 'ซ่อนข่าวสารนี้' : 'แสดงข่าวสารนี้'}
                       >
                         {news.is_published ? (
                           <><Eye size={12} /> แสดงผล</>
@@ -238,6 +240,7 @@ export default function AdminNews() {
                           className="btn btn-secondary btn-icon"
                           onClick={() => handleOpenModal(news)}
                           title="แก้ไข"
+                          aria-label="แก้ไขข่าวสาร"
                         >
                           <Edit2 size={16} />
                         </button>
@@ -246,6 +249,7 @@ export default function AdminNews() {
                           style={{ color: 'var(--color-brand-rose)', borderColor: 'rgba(225, 29, 72, 0.2)' }}
                           onClick={() => handleDelete(news)}
                           title="ลบ"
+                          aria-label="ลบข่าวสาร"
                         >
                           <Trash2 size={16} />
                         </button>

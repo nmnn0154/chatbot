@@ -1571,9 +1571,12 @@ select.input {
     min-width: unset;
   }
 
-  /* Show card list, hide table */
+  /* Allow responsive horizontal scrolling on mobile */
   .table-wrapper {
-    display: none;
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .card-list {
