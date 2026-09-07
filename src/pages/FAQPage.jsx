@@ -38,7 +38,7 @@ export default function FAQPage() {
     <div className="page-container animate-fade-in" id="faq-page">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1>❓ คำถามที่พบบ่อย (FAQ)</h1>
+          <h1>คำถามที่พบบ่อย (FAQ)</h1>
           <p>รวมคำถามและคำตอบเบื้องต้น คุณสามารถหาคำตอบได้ทันทีที่นี่</p>
         </div>
         <Link to="/chat" className="btn btn-primary">

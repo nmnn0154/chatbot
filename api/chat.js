@@ -1,106 +1,24 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { handleChat, isRateLimited, getBearerToken } from './_lib/handlers.js';
 
 /**
- * In-memory rate limiting map for basic protection
- * Key: IP, Value: { count, resetTime }
- */
-const rateLimitMap = new Map();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 30; // Max 30 requests per minute per IP
-
-function isRateLimited(ip) {
-  const now = Date.now();
-  const record = rateLimitMap.get(ip);
-
-  if (!record || now > record.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-
-  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
-    return true;
-  }
-
-  record.count += 1;
-  return false;
-}
-
-/**
- * Vercel Serverless Function to handle Gemini API Proxy in Production
- * Deployed automatically on Vercel at /api/chat
+ * Vercel Serverless Function — POST /api/chat
+ * Runs server-side RAG retrieval + Gemini generation. See api/_lib/handlers.js.
  */
 export default async function handler(req, res) {
-  // Allow only POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Basic IP Rate Limiting
   const clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
   if (isRateLimited(clientIp)) {
-    return res.status(429).json({ 
-      error: 'คุณส่งข้อความเร็วเกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง' 
+    return res.status(429).json({
+      error: 'คุณส่งข้อความเร็วเกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง',
     });
   }
 
-  try {
-    const { message, context } = req.body || {};
+  const { message } = req.body || {};
+  const accessToken = getBearerToken(req);
 
-    if (!message || typeof message !== 'string' || message.trim().length === 0) {
-      return res.status(400).json({ error: 'Message is required and must be a non-empty string' });
-    }
-
-    if (message.length > 2000) {
-      return res.status(400).json({ error: 'Message is too long (maximum 2,000 characters)' });
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      console.error('GEMINI_API_KEY is not configured in Vercel Environment Variables');
-      return res.status(500).json({ error: 'Gemini API key not configured' });
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // Use gemini-3.5-flash as standard official model
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
-
-    let systemPrompt = `คุณคือผู้ช่วย AI ชื่อ "กยศ. Chatbot" ของ มทร.ศรีวิชัย
-หน้าที่ของคุณคือตอบคำถามเกี่ยวกับกองทุนเงินให้กู้ยืมเพื่อการศึกษา (กยศ.) โดยวิเคราะห์จากข้อมูลอ้างอิงจากเอกสารที่ให้มา
-พยายามตอบคำถามอย่างละเอียด ครบถ้วน และแม่นยำที่สุด โดยดึงข้อมูลที่เกี่ยวข้องจากเอกสารมาอธิบายให้ผู้ใช้เข้าใจ
-หากผู้ใช้พิมพ์มาสั้นๆ เป็นคีย์เวิร์ด (เช่น "เอกสาร", "คุณสมบัติ", "ขั้นตอน") ให้สันนิษฐานว่าผู้ใช้อยากทราบข้อมูลที่เกี่ยวข้องกับคีย์เวิร์ดนั้นในบริบทของ กยศ. และให้สรุปข้อมูลที่เกี่ยวข้องทั้งหมดมาเสนอเลย ไม่ต้องปฏิเสธ
-หากถามนอกเรื่อง ให้บอกปัดอย่างสุภาพและพาผู้ใช้กลับสู่เรื่อง กยศ.
-หากคำถามหรือคีย์เวิร์ดนั้นไม่มีข้อมูลเกี่ยวข้องในเอกสารเลยจริงๆ (และไม่ใช่คำทักทาย) ให้ตอบว่า "ขออภัยครับ ข้อมูลในเอกสารที่ผมมีไม่ครอบคลุมคำถามนี้ กรุณาติดต่อกองพัฒนานักศึกษา มทร.ศรีวิชัย หรือ กยศ. Call Center 0-2016-4888"
-ตอบด้วยภาษาที่สุภาพ เป็นคำแนะนำที่ชัดเจน และจัดรูปแบบด้วย markdown (เช่น ใช้ bullet points หรือตัวหนา) เพื่อให้อ่านง่าย
-
-ข้อมูลอ้างอิงจากเอกสาร:\n`;
-    
-    if (context && Array.isArray(context) && context.length > 0) {
-      context.forEach((c, idx) => {
-        if (c?.answer) {
-          systemPrompt += `[ส่วนที่ ${idx + 1}]:\n${c.answer}\n\n`;
-        }
-      });
-    }
-
-    // Call Gemini API
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: message.trim() }] }],
-      systemInstruction: systemPrompt,
-    });
-
-    const response = result.response.text();
-    return res.status(200).json({ response });
-
-  } catch (error) {
-    console.error('Gemini API Error in Serverless Function:', error);
-    const errStr = String(error?.message || error);
-    if (errStr.includes('429') || errStr.includes('quota') || errStr.includes('RESOURCE_EXHAUSTED')) {
-      return res.status(429).json({ 
-        error: 'โควต้า API รายวันหมดชั่วคราว กรุณาลองใหม่อีกครั้งในภายหลัง' 
-      });
-    }
-    return res.status(500).json({ error: 'Failed to generate response' });
-  }
+  const { status, body } = await handleChat({ message, accessToken });
+  return res.status(status).json(body);
 }

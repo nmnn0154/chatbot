@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { getPublishedNews } from '../lib/newsApi';
-import { Megaphone, Calendar, X } from 'lucide-react';
+import { Megaphone, Calendar, X, MessageSquare } from 'lucide-react';
 
 export default function NewsPage() {
   const [newsList, setNewsList] = useState([]);
@@ -28,9 +29,15 @@ export default function NewsPage() {
 
   return (
     <div className="page-container animate-fade-in">
-      <div className="page-header">
-        <h1>ข่าวสารและประกาศ</h1>
-        <p>ข่าวสารล่าสุดเกี่ยวกับการกู้ยืมและกิจกรรมต่างๆ ของ กยศ.</p>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1>ข่าวสารและประกาศ</h1>
+          <p>ข่าวสารล่าสุดเกี่ยวกับการกู้ยืมและกิจกรรมต่างๆ ของ กยศ.</p>
+        </div>
+        <Link to="/chat" className="btn btn-primary">
+          <MessageSquare size={18} />
+          กลับไปหน้าแชท
+        </Link>
       </div>
 
       <div className="page-content">
@@ -52,26 +59,17 @@ export default function NewsPage() {
                 style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
                 onClick={() => setSelectedNews(news)}
               >
-                {/* Card Image */}
                 {news.image_url && (
-                  <div style={{ width: '100%', height: '180px', overflow: 'hidden' }}>
+                  <div style={{ width: '100%', aspectRatio: '16 / 9', overflow: 'hidden', background: 'var(--color-bg-tertiary)' }}>
                     <img
                       src={news.image_url}
-                      alt={news.title}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        transition: 'transform 0.3s ease'
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
-                      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      alt=""
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     />
                   </div>
                 )}
-
                 {/* Card Content */}
-                <div style={{ padding: 'var(--space-md)', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: 'var(--space-md)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--color-brand-violet)' }}>
                     <Megaphone size={18} />
                     <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>ประกาศ กยศ.</span>
@@ -111,18 +109,12 @@ export default function NewsPage() {
                 ประกาศเมื่อ: {formatDate(selectedNews.created_at)}
               </div>
 
-              {/* Modal Image */}
               {selectedNews.image_url && (
-                <div style={{
-                  marginBottom: '20px',
-                  borderRadius: 'var(--radius-lg)',
-                  overflow: 'hidden',
-                  border: '1px solid var(--color-border)'
-                }}>
+                <div style={{ marginBottom: '20px', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
                   <img
                     src={selectedNews.image_url}
                     alt={selectedNews.title}
-                    style={{ width: '100%', maxHeight: '400px', objectFit: 'cover', display: 'block' }}
+                    style={{ width: '100%', maxHeight: '420px', objectFit: 'cover', display: 'block' }}
                   />
                 </div>
               )}

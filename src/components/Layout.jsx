@@ -12,6 +12,7 @@ import {
   X,
   HelpCircle,
   Megaphone,
+  CalendarDays,
 } from 'lucide-react';
 
 export default function Layout({ children }) {
@@ -102,6 +103,14 @@ export default function Layout({ children }) {
             <Megaphone size={20} />
             ข่าวสารและประกาศ
           </NavLink>
+          <NavLink
+            to="/calendar"
+            className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+            onClick={closeSidebar}
+          >
+            <CalendarDays size={20} />
+            ปฏิทินการดำเนินงาน
+          </NavLink>
 
           {isAdmin && (
             <>
@@ -141,6 +150,14 @@ export default function Layout({ children }) {
               >
                 <Megaphone size={20} />
                 จัดการข่าวสาร
+              </NavLink>
+              <NavLink
+                to="/admin/calendar"
+                className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+                onClick={closeSidebar}
+              >
+                <CalendarDays size={20} />
+                จัดการปฏิทิน
               </NavLink>
             </>
           )}
@@ -224,6 +241,19 @@ export default function Layout({ children }) {
       {/* Main Content */}
       <main className="main-content">
         {children}
+        {location.pathname !== '/chat' && (
+          <footer className="app-footer">
+            <span>
+              <strong>กองพัฒนานักศึกษา</strong> มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย
+            </span>
+            <span>
+              กยศ. Call Center 0-2016-4888 ·{' '}
+              <a href="https://www.rmutsv.ac.th" target="_blank" rel="noreferrer">
+                www.rmutsv.ac.th
+              </a>
+            </span>
+          </footer>
+        )}
       </main>
     </div>
   );

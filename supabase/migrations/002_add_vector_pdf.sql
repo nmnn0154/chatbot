@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS public.document_chunks (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   document_id UUID REFERENCES public.documents(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
-  embedding vector(3072) NOT NULL, -- Gemini Text Embedding 004 uses 768 dimensions
+  embedding vector(3072) NOT NULL, -- Gemini "gemini-embedding-001" outputs 3072 dimensions by default
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

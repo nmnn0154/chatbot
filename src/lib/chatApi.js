@@ -22,61 +22,28 @@ async function generateEmbeddings(texts) {
 }
 
 /**
- * Search document chunks using vector similarity
- */
-async function searchDocumentChunks(query) {
-  try {
-    // Enhance short queries with domain context to improve vector similarity matching
-    // Words like "คุณสมบัติ" are too generic, so we anchor them to the domain context.
-    let searchString = query.trim();
-    if (searchString.length < 30 && !searchString.includes('กยศ')) {
-       searchString = `${searchString} กยศ. กองทุนเงินให้กู้ยืมเพื่อการศึกษา`;
-    }
-
-    // 1. Generate embedding for the search query
-    const embeddings = await generateEmbeddings([searchString]);
-    if (!embeddings || embeddings.length === 0) return [];
-
-    const queryEmbedding = embeddings[0];
-
-    // 2. Call the RPC function in Supabase
-    const { data, error } = await supabase.rpc('match_document_chunks', {
-      query_embedding: `[${queryEmbedding.join(',')}]`,
-      match_threshold: 0.2, // lowered to catch more potential context matches
-      match_count: 15 // top 15 most relevant chunks to provide detailed context
-    });
-
-    if (error) throw error;
-    
-    return data || [];
-  } catch (error) {
-    console.error('Vector search error:', error);
-    return [];
-  }
-}
-
-/**
- * Send a message to the Gemini-powered chatbot via server proxy.
+ * Send a message to the Gemini-powered chatbot.
+ *
+ * Retrieval-Augmented Generation now happens entirely server-side in
+ * `/api/chat` (see api/_lib/handlers.js). The client only forwards the message
+ * plus the user's Supabase access token so RLS still applies during retrieval.
  */
 export async function sendChatMessage(message, userId) {
   try {
-    // Step 1: Search PDF document chunks for relevant context (Semantic Search)
-    const chunks = await searchDocumentChunks(message);
+    // Attach the signed-in user's JWT so the server can query document_chunks
+    // under Row Level Security.
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
 
-    // Map chunks to expected context format for chat.js
-    const context = chunks.map(chunk => ({
-      topic: 'เอกสารอ้างอิง',
-      question: 'ข้อความในเอกสาร',
-      answer: chunk.content
-    }));
-
-    // Step 2: Call Gemini via server proxy
     let botResponse;
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, context, userId }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({ message }),
       });
 
       if (!response.ok) {
@@ -156,16 +123,18 @@ export async function rateChatResponse(historyId, rating, userId = null) {
   if (!historyId || !rating) return false;
   
   try {
-    const { error } = await supabase
-      .from('chat_histories')
-      .update({ rating })
-      .eq('id', historyId);
-      
+    // Goes through a SECURITY DEFINER function (migration 008) that only ever
+    // touches the `rating` column of a not-yet-rated row.
+    const { error } = await supabase.rpc('rate_chat_response', {
+      p_id: historyId,
+      p_rating: rating,
+    });
+
     if (error) throw error;
-    
+
     // Update local storage rating
     updateLocalChatRating(historyId, rating, userId);
-    
+
     return true;
   } catch (error) {
     console.error('Failed to rate chat response:', error);

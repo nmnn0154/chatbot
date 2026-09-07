@@ -156,7 +156,7 @@ export default function AdminFaq() {
   return (
     <div className="page-container animate-fade-in" id="admin-faq-page">
       <div className="page-header">
-        <h1>❓ จัดการคำถามที่พบบ่อย (FAQ)</h1>
+        <h1>จัดการคำถามที่พบบ่อย (FAQ)</h1>
         <p>สร้างคำถาม-คำตอบล่วงหน้าเพื่อลดภาระของระบบ AI และให้ข้อมูลผู้ใช้ได้ทันที</p>
       </div>
 

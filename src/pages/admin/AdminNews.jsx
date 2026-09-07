@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAllNews, createNews, updateNews, deleteNews, deleteNewsImage } from '../../lib/newsApi';
+import { getAllNews, createNews, updateNews, deleteNews } from '../../lib/newsApi';
 import { Plus, Edit2, Trash2, Eye, EyeOff, Save, X, Megaphone, Calendar, ImagePlus, XCircle } from 'lucide-react';
 
 export default function AdminNews() {
   const [newsList, setNewsList] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingNews, setEditingNews] = useState(null);
   const [formData, setFormData] = useState({ title: '', content: '', is_published: true });
@@ -54,16 +53,12 @@ export default function AdminNews() {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    // Validate size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert('ไฟล์ภาพต้องมีขนาดไม่เกิน 5MB');
       return;
     }
-
     setImageFile(file);
     setRemoveExistingImage(false);
-    // Create preview
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result);
     reader.readAsDataURL(file);
@@ -86,16 +81,13 @@ export default function AdminNews() {
     setSaving(true);
     let success;
     if (editingNews) {
-      const updates = { ...formData };
-      // If user removed image without adding new one
-      if (removeExistingImage && !imageFile) {
-        // Delete old image from storage
-        if (editingNews.image_url) {
-          await deleteNewsImage(editingNews.image_url);
-        }
-        updates.image_url = null;
-      }
-      success = await updateNews(editingNews.id, updates, imageFile || null, editingNews.image_url);
+      success = await updateNews(
+        editingNews.id,
+        { ...formData },
+        imageFile || null,
+        editingNews.image_url || null,
+        removeExistingImage && !imageFile,
+      );
     } else {
       success = await createNews(formData.title, formData.content, formData.is_published, imageFile || null);
     }
@@ -112,19 +104,14 @@ export default function AdminNews() {
   const handleDelete = async (news) => {
     if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข่าวสารนี้? ข้อมูลที่ลบจะไม่สามารถกู้คืนได้')) {
       const success = await deleteNews(news.id, news.image_url || null);
-      if (success) {
-        loadNews();
-      } else {
-        alert('เกิดข้อผิดพลาดในการลบข้อมูล');
-      }
+      if (success) loadNews();
+      else alert('เกิดข้อผิดพลาดในการลบข้อมูล');
     }
   };
 
   const togglePublish = async (news) => {
     const success = await updateNews(news.id, { is_published: !news.is_published });
-    if (success) {
-      loadNews();
-    }
+    if (success) loadNews();
   };
 
   const formatDate = (dateStr) => {
@@ -133,7 +120,7 @@ export default function AdminNews() {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
@@ -185,7 +172,7 @@ export default function AdminNews() {
                             height: '48px',
                             objectFit: 'cover',
                             borderRadius: 'var(--radius-md)',
-                            border: '1px solid var(--color-border)'
+                            border: '1px solid var(--color-border)',
                           }}
                         />
                       ) : (
@@ -198,7 +185,7 @@ export default function AdminNews() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: 'var(--color-text-muted)'
+                          color: 'var(--color-text-muted)',
                         }}>
                           <Megaphone size={20} />
                         </div>
@@ -263,10 +250,9 @@ export default function AdminNews() {
         )}
       </div>
 
-      {/* Add/Edit Modal */}
       {isModalOpen && (
         <div className="modal-backdrop" onClick={handleCloseModal}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
             <div className="modal-header">
               <h2>{editingNews ? 'แก้ไขข่าวสาร' : 'เพิ่มข่าวสารใหม่'}</h2>
               <button className="btn btn-ghost btn-icon" onClick={handleCloseModal}>
@@ -275,49 +261,39 @@ export default function AdminNews() {
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
-                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label htmlFor="title" style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>หัวข้อข่าวสาร</label>
+                <div className="form-group">
+                  <label htmlFor="title" className="form-label">หัวข้อข่าวสาร</label>
                   <input
                     id="title"
                     type="text"
                     className="input"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="เช่น กำหนดการยื่นแบบเบิกเงินกู้ยืมภาคเรียนที่ 1/2567"
+                    placeholder="เช่น กำหนดการยื่นแบบเบิกเงินกู้ยืม ภาคเรียนที่ 1/2568"
                     required
                   />
                 </div>
 
-                {/* Image Upload */}
-                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>รูปภาพประกอบ (ไม่บังคับ)</label>
+                {/* Image */}
+                <div className="form-group">
+                  <label className="form-label">รูปภาพประกอบ (ไม่บังคับ)</label>
                   {imagePreview ? (
                     <div style={{ position: 'relative', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
                       <img
                         src={imagePreview}
-                        alt="Preview"
+                        alt="ตัวอย่าง"
                         style={{ width: '100%', maxHeight: '240px', objectFit: 'cover', display: 'block' }}
                       />
                       <button
                         type="button"
                         onClick={handleRemoveImage}
-                        style={{
-                          position: 'absolute',
-                          top: '8px',
-                          right: '8px',
-                          background: 'rgba(0,0,0,0.6)',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '50%',
-                          width: '32px',
-                          height: '32px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'background 0.2s'
-                        }}
                         title="ลบรูปภาพ"
+                        style={{
+                          position: 'absolute', top: '8px', right: '8px',
+                          background: 'rgba(15,23,42,0.6)', color: '#fff', border: 'none',
+                          borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
                       >
                         <XCircle size={20} />
                       </button>
@@ -332,15 +308,12 @@ export default function AdminNews() {
                         textAlign: 'center',
                         cursor: 'pointer',
                         color: 'var(--color-text-muted)',
-                        transition: 'border-color 0.2s, background 0.2s',
-                        background: 'var(--color-bg-tertiary)'
+                        background: 'var(--color-bg-tertiary)',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-brand-indigo)'; e.currentTarget.style.background = 'rgba(30, 58, 138, 0.04)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.background = 'var(--color-bg-tertiary)'; }}
                     >
-                      <ImagePlus size={36} style={{ margin: '0 auto 8px', opacity: 0.6 }} />
+                      <ImagePlus size={32} style={{ margin: '0 auto 8px', opacity: 0.6 }} />
                       <p style={{ fontSize: 'var(--text-sm)', margin: 0 }}>คลิกเพื่อเลือกรูปภาพ</p>
-                      <p style={{ fontSize: 'var(--text-xs)', margin: '4px 0 0', opacity: 0.7 }}>รองรับ JPG, PNG, WEBP (ไม่เกิน 5MB)</p>
+                      <p style={{ fontSize: 'var(--text-xs)', margin: '4px 0 0', opacity: 0.7 }}>JPG, PNG, WEBP (ไม่เกิน 5MB)</p>
                     </div>
                   )}
                   <input
@@ -352,30 +325,28 @@ export default function AdminNews() {
                   />
                 </div>
 
-                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label htmlFor="content" style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>เนื้อหารายละเอียด</label>
+                <div className="form-group">
+                  <label htmlFor="content" className="form-label">เนื้อหารายละเอียด</label>
                   <textarea
                     id="content"
                     className="input"
                     value={formData.content}
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                    placeholder="พิมพ์รายละเอียดเนื้อหาข่าวที่นี่ (สามารถเว้นบรรทัดได้)"
+                    placeholder="พิมพ์รายละเอียดเนื้อหาข่าวที่นี่ (เว้นบรรทัดได้)"
                     rows={8}
                     required
                   />
                 </div>
-                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-sm)' }}>
                   <input
-                    id="is_published"
                     type="checkbox"
                     checked={formData.is_published}
                     onChange={(e) => setFormData({ ...formData, is_published: e.target.checked })}
                     style={{ width: '16px', height: '16px' }}
                   />
-                  <label htmlFor="is_published" style={{ fontSize: 'var(--text-sm)' }}>
-                    เปิดให้ผู้ใช้เห็นทันที (แสดงผลหน้าข่าวสาร)
-                  </label>
-                </div>
+                  เปิดให้ผู้ใช้เห็นทันที (แสดงผลหน้าข่าวสาร)
+                </label>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>

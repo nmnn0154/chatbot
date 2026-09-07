@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { downloadCsv } from '../../lib/csv';
 import {
   BookOpen,
   MessageSquare,
@@ -9,7 +10,8 @@ import {
   ArrowRight,
   HelpCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  FileDown
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -121,15 +123,19 @@ export default function AdminDashboard() {
     }
   }
 
-  const formatDate = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString('th-TH', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  async function exportChatHistoriesCsv() {
+    const { data } = await supabase
+      .from('chat_histories')
+      .select('created_at, user_message, bot_response, rating')
+      .order('created_at', { ascending: false })
+      .limit(5000);
+    downloadCsv('chat_histories', (data || []).map((c) => ({
+      วันที่: new Date(c.created_at).toLocaleString('th-TH'),
+      คำถามผู้ใช้: c.user_message,
+      คำตอบบอท: c.bot_response,
+      คะแนนดาว: c.rating ?? '',
+    })));
+  }
 
   if (loading) {
     return (
@@ -149,12 +155,12 @@ export default function AdminDashboard() {
       {/* Stats Grid */}
       <div className="stats-grid stagger-children">
         <div className="card card-glow stat-card">
-          <div className="stat-icon stat-icon-indigo">
-            <BookOpen size={24} />
+          <div className="stat-icon stat-icon-emerald">
+            <Users size={24} />
           </div>
           <div className="stat-content">
-            <h3>{stats.totalKB}</h3>
-            <p>ฐานความรู้ทั้งหมด</p>
+            <h3>{stats.totalUsers}</h3>
+            <p>ผู้ใช้ทั้งหมด</p>
           </div>
         </div>
 
@@ -169,16 +175,6 @@ export default function AdminDashboard() {
         </div>
 
         <div className="card card-glow stat-card">
-          <div className="stat-icon stat-icon-emerald">
-            <Users size={24} />
-          </div>
-          <div className="stat-content">
-            <h3>{stats.totalUsers}</h3>
-            <p>ผู้ใช้ทั้งหมด</p>
-          </div>
-        </div>
-
-        <div className="card card-glow stat-card">
           <div className="stat-icon stat-icon-amber">
             <TrendingUp size={24} />
           </div>
@@ -189,14 +185,30 @@ export default function AdminDashboard() {
         </div>
 
         <div className="card card-glow stat-card">
+          <div className="stat-icon stat-icon-indigo">
+            <BookOpen size={24} />
+          </div>
+          <div className="stat-content">
+            <h3>{stats.totalKB}</h3>
+            <p>ฐานความรู้ทั้งหมด</p>
+          </div>
+        </div>
+
+        <div className="card card-glow stat-card">
           <div className="stat-icon stat-icon-emerald" style={{ color: 'var(--color-warning)' }}>
             <span style={{ fontSize: '1.5rem' }}>★</span>
           </div>
           <div className="stat-content">
             <h3>{stats.avgRating > 0 ? stats.avgRating : '-'}</h3>
-            <p>คะแนนความพึงพอใจ</p>
+            <p>คะแนนดาวเฉลี่ย (ต่อคำตอบ)</p>
           </div>
         </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: 'var(--space-md) 0' }}>
+        <button className="btn btn-secondary btn-sm" onClick={exportChatHistoriesCsv}>
+          <FileDown size={16} /> ส่งออกประวัติแชท (CSV)
+        </button>
       </div>
 
       {/* Quick Actions */}
@@ -204,7 +216,7 @@ export default function AdminDashboard() {
         {/* Frequent Questions */}
         <div className="card" style={{ flex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>
-            <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>🔍 Insights: คำถามที่ผู้ใช้งานแชทเข้ามาบ่อย</h2>
+            <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>คำถามที่ผู้ใช้แชทเข้ามาบ่อย</h2>
           </div>
 
           {frequentQuestions.length === 0 ? (
@@ -258,7 +270,7 @@ export default function AdminDashboard() {
         {/* Quick Links */}
         <div className="card" style={{ flex: 1 }}>
           <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginBottom: 'var(--space-lg)' }}>
-            ⚡ การจัดการ
+            การจัดการ
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
             <Link

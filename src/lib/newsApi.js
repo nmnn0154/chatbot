@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 const BUCKET = 'news-images';
 
 /**
- * Upload an image to Supabase Storage and return the public URL
+ * Upload an image to Supabase Storage and return its public URL.
  */
 export async function uploadNewsImage(file) {
   try {
@@ -25,16 +25,14 @@ export async function uploadNewsImage(file) {
 }
 
 /**
- * Delete an image from Supabase Storage by its public URL
+ * Delete an image from Supabase Storage by its public URL.
  */
 export async function deleteNewsImage(publicUrl) {
   try {
     if (!publicUrl) return;
     const parts = publicUrl.split(`/storage/v1/object/public/${BUCKET}/`);
     if (parts.length < 2) return;
-    const filePath = parts[1];
-
-    const { error } = await supabase.storage.from(BUCKET).remove([filePath]);
+    const { error } = await supabase.storage.from(BUCKET).remove([parts[1]]);
     if (error) throw error;
   } catch (error) {
     console.error('Failed to delete image:', error);
@@ -79,23 +77,16 @@ export async function getAllNews() {
 }
 
 /**
- * Create new announcement (with optional image)
+ * Create a new announcement (with optional image)
  */
 export async function createNews(title, content, isPublished = true, imageFile = null) {
   try {
     let image_url = null;
-    if (imageFile) {
-      image_url = await uploadNewsImage(imageFile);
-    }
+    if (imageFile) image_url = await uploadNewsImage(imageFile);
 
     const { error } = await supabase
       .from('announcements')
-      .insert({
-        title,
-        content,
-        is_published: isPublished,
-        image_url
-      });
+      .insert({ title, content, is_published: isPublished, image_url });
 
     if (error) throw error;
     return true;
@@ -106,27 +97,23 @@ export async function createNews(title, content, isPublished = true, imageFile =
 }
 
 /**
- * Update announcement
+ * Update an announcement. Pass a new imageFile to replace the image
+ * (the old one is removed); pass removeImage to clear it.
  */
-export async function updateNews(id, updates, imageFile = null, oldImageUrl = null) {
+export async function updateNews(id, updates, imageFile = null, oldImageUrl = null, removeImage = false) {
   try {
-    // If a new image is being uploaded, upload it and remove the old one
     if (imageFile) {
       const newUrl = await uploadNewsImage(imageFile);
       if (newUrl) {
         updates.image_url = newUrl;
-        // Delete old image if it exists
-        if (oldImageUrl) {
-          await deleteNewsImage(oldImageUrl);
-        }
+        if (oldImageUrl) await deleteNewsImage(oldImageUrl);
       }
+    } else if (removeImage) {
+      updates.image_url = null;
+      if (oldImageUrl) await deleteNewsImage(oldImageUrl);
     }
 
-    const { error } = await supabase
-      .from('announcements')
-      .update(updates)
-      .eq('id', id);
-
+    const { error } = await supabase.from('announcements').update(updates).eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -136,20 +123,13 @@ export async function updateNews(id, updates, imageFile = null, oldImageUrl = nu
 }
 
 /**
- * Delete announcement (and its image)
+ * Delete an announcement (and its image)
  */
 export async function deleteNews(id, imageUrl = null) {
   try {
-    // Clean up image from storage
-    if (imageUrl) {
-      await deleteNewsImage(imageUrl);
-    }
+    if (imageUrl) await deleteNewsImage(imageUrl);
 
-    const { error } = await supabase
-      .from('announcements')
-      .delete()
-      .eq('id', id);
-
+    const { error } = await supabase.from('announcements').delete().eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {

@@ -11,11 +11,13 @@ import ChatPage from './pages/ChatPage';
 // Lazy load secondary and heavy admin pages (e.g. pdfjs-dist, xlsx)
 const FAQPage = lazy(() => import('./pages/FAQPage'));
 const NewsPage = lazy(() => import('./pages/NewsPage'));
+const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const KnowledgeBase = lazy(() => import('./pages/admin/KnowledgeBase'));
 const AdminFaq = lazy(() => import('./pages/admin/AdminFaq'));
 const AdminNews = lazy(() => import('./pages/admin/AdminNews'));
+const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
 
 function PageLoader() {
   return (
@@ -67,6 +69,17 @@ function App() {
               }
             />
 
+            <Route
+              path="/calendar"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <CalendarPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
             {/* Protected - Admin */}
             <Route
               path="/admin"
@@ -105,6 +118,17 @@ function App() {
                 <ProtectedRoute requireAdmin>
                   <Layout>
                     <AdminNews />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/calendar"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <Layout>
+                    <AdminCalendar />
                   </Layout>
                 </ProtectedRoute>
               }

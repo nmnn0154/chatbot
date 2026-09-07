@@ -91,6 +91,7 @@ export default function ChatPage() {
         historyId: historyId, // Store historyId to rate it later
       };
       setMessages((prev) => [...prev, botMessage]);
+
       // If we are looking at a history item, submitting a new message should perhaps clear the history ID from URL
       if (chatId) {
         navigate('/chat', { replace: true });
@@ -166,7 +167,7 @@ export default function ChatPage() {
             <div className="chat-welcome-icon">
               <Sparkles size={32} color="white" />
             </div>
-            <h2 className="gradient-text">สวัสดีครับ! 👋</h2>
+            <h2 className="gradient-text">สวัสดีครับ</h2>
             <p>
               ผมคือแชทบอท กยศ. พร้อมช่วยตอบคำถามเกี่ยวกับกองทุนเงินให้กู้ยืมเพื่อการศึกษา
               สำหรับนักศึกษา มทร.ศรีวิชัย
