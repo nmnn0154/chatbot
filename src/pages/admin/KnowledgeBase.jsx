@@ -15,8 +15,455 @@ import {
   X,
   AlertTriangle,
   Check,
-  FileText
+  FileText,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
+
+/* ─── กยศ. Preset Knowledge Data (มทร.ศรีวิชัย สงขลา) ───────────── */
+const GSL_PRESETS = [
+  {
+    id: 'gsl_eligibility',
+    title: 'คุณสมบัติผู้กู้ยืมเงิน กยศ. มทร.ศรีวิชัย',
+    content: `คุณสมบัติผู้กู้ยืมเงินกองทุนเงินให้กู้ยืมเพื่อการศึกษา (กยศ.) — มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย (สงขลา)
+
+1. สัญชาติไทย
+2. มีคุณสมบัติแบ่งเป็น 2 ลักษณะ:
+   - ลักษณะที่ 1 (ขาดแคลนทุนทรัพย์): รายได้ครอบครัวรวมกันไม่เกิน 360,000 บาท/ปี
+   - ลักษณะที่ 2 (สาขาวิชาที่เป็นความต้องการหลัก): ไม่จำกัดรายได้ครอบครัว (เช่น วิศวกรรมศาสตร์, เทคโนโลยี, วิทยาศาสตร์)
+3. ศึกษาอยู่ในคณะ/สาขาวิชาของ มทร.ศรีวิชัย
+4. ไม่เป็นผู้สำเร็จการศึกษาในระดับปริญญาตรีในสาขาใดมาก่อน
+5. มีผลการเรียนสะสม (GPA) ตามเกณฑ์ที่มหาวิทยาลัยและกองทุนกำหนด
+6. มีประวัติการทำกิจกรรมจิตอาสาบำเพ็ญประโยชน์ครบ 36 ชั่วโมง/ปีการศึกษา
+7. ไม่เคยเป็นผู้ผิดนัดชำระหนี้ กยศ. มาก่อน (ยกเว้นได้รับการปรับปรุงโครงสร้างหนี้แล้ว)`,
+  },
+  {
+    id: 'gsl_documents',
+    title: 'เอกสารที่ใช้ในการกู้ยืม กยศ. มทร.ศรีวิชัย',
+    content: `เอกสารประกอบการขอกู้ยืมเงิน กยศ. มทร.ศรีวิชัย สงขลา
+
+เอกสารส่วนตัวผู้กู้:
+1. สำเนาบัตรประจำตัวประชาชนของผู้กู้ (ยังไม่หมดอายุ)
+2. สำเนาทะเบียนบ้านของผู้กู้
+3. ใบแสดงผลการเรียน (Transcript) หรือ ปพ.1
+4. หลักฐานการเป็นนักศึกษา มทร.ศรีวิชัย (ใบเสร็จลงทะเบียนเรียน)
+5. สมุดบัญชีเงินฝากธนาคารกรุงไทย, ธ.ก.ส. หรือ ธนาคารอิสลาม (ชื่อผู้กู้เท่านั้น)
+6. สมุดบันทึกกิจกรรมจิตอาสาครบ 36 ชั่วโมง (สำหรับผู้กู้รายเก่า)
+
+เอกสารผู้ปกครอง:
+1. สำเนาบัตรประชาชน และสำเนาทะเบียนบ้านของ บิดา-มารดา หรือ ผู้ปกครอง
+2. หนังสือรับรองรายได้ครอบครัว (แบบ กยศ.102) พร้อมสำเนาบัตรข้าราชการ/เจ้าหน้าที่รัฐผู้รับรอง
+3. สลิปเงินเดือนหรือหนังสือรับรองเงินเดือนล่าสุด (กรณีมีรายได้ประจำ)
+
+หมายเหตุ: ตั้งแต่ปีการศึกษา 2567 เป็นต้นมา กยศ. ยกเลิกการใช้ผู้ค้ำประกันสำหรับผู้กู้รายใหม่ทุกราย`,
+  },
+  {
+    id: 'gsl_process',
+    title: 'ขั้นตอนการกู้ยืมเงิน กยศ. มทร.ศรีวิชัย (ระบบ DSL)',
+    content: `ขั้นตอนการยื่นกู้ยืมเงิน กยศ. ผ่านระบบ DSL — มทร.ศรีวิชัย สงขลา
+
+1. ลงทะเบียนและยื่นคำขอกู้ยืมในระบบ DSL (www.studentloan.or.th) หรือแอป กยศ. Connect
+2. เลือกสถานศึกษา "มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย" และเลือกคณะ/สาขาวิชาที่กำลังศึกษา
+3. แนบไฟล์เอกสารหลักฐานในระบบ DSL ให้ครบถ้วน
+4. พิมพ์แบบคำขอกู้ยืมและเอกสารประกอบ นำส่งที่งานแนะแนวและทุนการศึกษา กองพัฒนานักศึกษา อาคาร 7 ชั้น 1
+5. เข้ารับการสัมภาษณ์คัดกรองคุณสมบัติ ณ กองพัฒนานักศึกษา
+6. กยศ. และมหาวิทยาลัยประกาศผลการอนุมัติสิทธิ์กู้ยืม
+7. จัดทำสัญญากู้ยืมเงินและแบบยืนยันเบิกเงินค่าเล่าเรียน/ค่าครองชีพ
+8. การโอนเงิน: ค่าเล่าเรียนโอนตรงเข้ามหาวิทยาลัย ส่วนค่าครองชีพ (3,000 บ./ด.) โอนเข้าบัญชีผู้กู้ทุกวันที่ 15 ของเดือน`,
+  },
+  {
+    id: 'gsl_volunteer',
+    title: 'กิจกรรมจิตอาสา 36 ชั่วโมง กยศ. มทร.ศรีวิชัย',
+    content: `แนวทางการทำกิจกรรมจิตอาสาเพื่อสังคมและสาธารณประโยชน์ (36 ชม./ปีการศึกษา) — มทร.ศรีวิชัย
+
+1. กิจกรรมภายในมหาวิทยาลัย: กิจกรรมปฐมนิเทศ, วันไหว้ครู, กิจกรรมชมรม, กิจกรรมช่วยเหลืองานคณะ/มหาวิทยาลัย
+2. กิจกรรมภายนอกมหาวิทยาลัย: บำเพ็ญประโยชน์ในชุมชน โรงเรียน วัด หรือมูลนิธิต่างๆ ใน จ.สงขลา
+3. การบริจาคโลหิต: ร่วมบริจาคโลหิตกับสภากาชาดไทย/ภาคบริการโลหิตที่ 12 สงขลา นับได้ครั้งละ 6 ชั่วโมง
+4. กิจกรรม e-Learning: อบรมหลักสูตรออนไลน์ผ่าน SET e-Learning หรือตลาดหลักทรัพย์ฯ นับชั่วโมงได้ตามที่ กยศ. กำหนด
+5. การส่งหลักฐาน: บันทึกลงในสมุดจิตอาสา กยศ. มทร.ศรีวิชัย ให้อาจารย์ที่ปรึกษาลงนามรับรอง และนำส่งที่กองพัฒนานักศึกษา อาคาร 7 ชั้น 1`,
+  },
+  {
+    id: 'gsl_amounts',
+    title: 'วงเงินกู้ยืม กยศ. ประจำปีการศึกษา มทร.ศรีวิชัย',
+    content: `อัตราวงเงินค่าเล่าเรียนและค่าครองชีพ กยศ. แต่ละคณะใน มทร.ศรีวิชัย
+
+ระดับปริญญาตรี (4 ปี):
+- คณะวิศวกรรมศาสตร์: ค่าเล่าเรียนตามจริงไม่เกิน 70,000 - 80,000 บาท/ปี
+- คณะบริหารธุรกิจ: ค่าเล่าเรียนตามจริงไม่เกิน 60,000 บาท/ปี
+- คณะศิลปศาสตร์: ค่าเล่าเรียนตามจริงไม่เกิน 60,000 บาท/ปี
+- คณะสถาปัตยกรรมศาสตร์: ค่าเล่าเรียนตามจริงไม่เกิน 70,000 บาท/ปี
+- คณะครุศาสตร์อุตสาหกรรมและเทคโนโลยี: ค่าเล่าเรียนตามจริงไม่เกิน 70,000 บาท/ปี
+- ค่าใช้จ่ายส่วนตัว (ค่าครองชีพ): 36,000 บาท/ปี (โอนเดือนละ 3,000 บาท x 12 เดือน)`,
+  },
+  {
+    id: 'gsl_repayment',
+    title: 'การชำระหนี้คืน กยศ. และอัตราดอกเบี้ย',
+    content: `เงื่อนไขการชำระหนี้คืนกองทุน กยศ. หลังสำเร็จการศึกษา
+
+1. ระยะเวลาปลอดหนี้: 2 ปี หลังสำเร็จการศึกษาหรือพ้นสภาพนักศึกษา
+2. อัตราดอกเบี้ย: ร้อยละ 1 ต่อปี ของเงินต้นคงเหลือ
+3. ระยะเวลาผ่อนชำระ: นานสูงสุด 15 ปี (นับจากวันที่ครบกำหนดชำระงวดแรก)
+4. กำหนดชำระ: วันที่ 5 กรกฎาคมของทุกปี หรือเลือกหักรายเดือนผ่านระบบ
+5. ช่องทางชำระเงิน:
+   - แอป กยศ. Connect สแกน QR Code ฟรีค่าธรรมเนียม
+   - Mobile Banking ทุกธนาคาร
+   - ธนาคารกรุงไทย, ธ.ก.ส., ธนาคารอิสลามแห่งประเทศไทย
+   - เคาน์เตอร์เซอร์วิส 7-Eleven, Lotus's`,
+  },
+  {
+    id: 'gsl_law_update',
+    title: 'กฎหมาย กยศ. ฉบับปรับปรุงใหม่และมาตรการผ่อนปรน',
+    content: `สาระสำคัญของ พ.ร.บ. กยศ. ฉบับใหม่ เพื่อความเป็นธรรมแก่ผู้กู้ยืม
+
+1. ลดเบี้ยปรับผิดนัดชำระหนี้: เหลือเพียงร้อยละ 0.5 ต่อปี (จากเดิม 7.5% ต่อปี)
+2. ลำดับการตัดชำระหนี้: ตัดเงินต้นก่อน > ดอกเบี้ย > เบี้ยปรับ
+3. ยกเลิกผู้ค้ำประกัน: ผู้กู้รายใหม่ไม่ต้องมีผู้ค้ำประกัน
+4. โครงการปรับโครงสร้างหนี้:
+   - ขยายเวลาผ่อนชำระได้สูงสุดถึงอายุ 65 ปี
+   - พักชำระหนี้และลบประวัติค้างชำระในเครดิตบูโร
+   - ปลดภาระผู้ค้ำประกันทันทีเมื่อทำสัญญาปรับโครงสร้างหนี้
+   - ยื่นเรื่องผ่านระบบออนไลน์ DSL หรือแอป กยศ. Connect`,
+  },
+  {
+    id: 'gsl_contact_rmutsv',
+    title: 'ช่องทางติดต่อ กยศ. มทร.ศรีวิชัย สงขลา และส่วนกลาง',
+    content: `ช่องทางการติดต่อและขอรับคำปรึกษา กยศ.
+
+มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย (สงขลา):
+- ที่ตั้ง: งานแนะแนวและทุนการศึกษา กองพัฒนานักศึกษา อาคาร 7 ชั้น 1
+- ที่อยู่: เลขที่ 1 ถนนราชดำเนินนอก ตำบลบ่อยาง อำเภอเมือง จังหวัดสงขลา 90000
+- โทรศัพท์: 074-317-100 ต่อ งานทุนการศึกษา กยศ.
+- เวลาทำการ: วันจันทร์ - ศุกร์ เวลา 08.30 - 16.30 น.
+- เว็บไซต์: www.rmutsv.ac.th
+
+กองทุนเงินให้กู้ยืมเพื่อการศึกษา (ส่วนกลาง):
+- Call Center: 0-2016-4888
+- เว็บไซต์หลัก: www.studentloan.or.th
+- ระบบ DSL: https://wsa.dsl.studentloan.or.th
+- แอปพลิเคชัน: กยศ. Connect (iOS / Android / Huawei)`,
+  },
+];
+
+/* ─── Preset Import Modal ────────────────────────────────────── */
+function PresetModal({ userId, existingDocuments = [], onSuccess, onClose }) {
+  const [selected, setSelected] = useState({});
+  const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [expanded, setExpanded] = useState(null);
+  const [error, setError] = useState('');
+
+  const checkIsImported = (presetTitle) => {
+    if (!existingDocuments || existingDocuments.length === 0) return false;
+    const clean = (str) => (str || '').trim().toLowerCase();
+    const target = clean(presetTitle);
+    return existingDocuments.some((doc) => {
+      const docName = clean(doc.filename || doc.title);
+      return docName === target || docName.includes(target) || target.includes(docName);
+    });
+  };
+
+  const importedCount = GSL_PRESETS.filter((p) => checkIsImported(p.title)).length;
+  const unimportedCount = GSL_PRESETS.length - importedCount;
+
+  const toggleSelect = (id) =>
+    setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  const selectAll = () => {
+    const all = {};
+    GSL_PRESETS.forEach((p) => { all[p.id] = true; });
+    setSelected(all);
+  };
+
+  const selectOnlyUnimported = () => {
+    const sel = {};
+    GSL_PRESETS.forEach((p) => {
+      if (!checkIsImported(p.title)) {
+        sel[p.id] = true;
+      }
+    });
+    setSelected(sel);
+  };
+
+  const clearSelection = () => {
+    setSelected({});
+  };
+
+  const selectedCount = Object.values(selected).filter(Boolean).length;
+
+  function chunkPreset(text, maxLen = 800) {
+    const paragraphs = text.split(/\n+/);
+    const chunks = [];
+    let cur = '';
+    for (const p of paragraphs) {
+      if (!p.trim()) continue;
+      if ((cur.length + p.length) > maxLen) {
+        if (cur) chunks.push(cur.trim());
+        cur = p + ' ';
+      } else {
+        cur += p + ' ';
+      }
+    }
+    if (cur.trim()) chunks.push(cur.trim());
+    return chunks.length ? chunks : [text.trim()];
+  }
+
+  async function handleImport() {
+    const toImport = GSL_PRESETS.filter((p) => selected[p.id]);
+    if (toImport.length === 0) {
+      setError('กรุณาเลือกอย่างน้อย 1 หัวข้อ');
+      return;
+    }
+    setProcessing(true);
+    setError('');
+    try {
+      for (let i = 0; i < toImport.length; i++) {
+        const preset = toImport[i];
+        setProgress(`กำลังนำเข้า (${i + 1}/${toImport.length}): ${preset.title}...`);
+        const chunks = chunkPreset(preset.content);
+        await uploadDocument(preset.title, userId, chunks);
+      }
+      onSuccess();
+    } catch (err) {
+      console.error('Preset import error:', err);
+      setError('เกิดข้อผิดพลาด: ' + err.message);
+      setProcessing(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={!processing ? onClose : undefined}>
+      <div className="modal" style={{ maxWidth: 620, width: '95%', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: 'var(--text-lg)' }}>
+            <Sparkles size={20} style={{ color: 'var(--color-primary)' }} />
+            นำเข้าองค์ความรู้ กยศ. พรีเซ็ต
+          </h2>
+          {!processing && (
+            <button className="btn btn-ghost btn-icon" onClick={onClose}>
+              <X size={20} />
+            </button>
+          )}
+        </div>
+
+        <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          {processing ? (
+            <div style={{ padding: '2.5rem', textAlign: 'center' }}>
+              <div className="spinner" style={{ margin: '0 auto 16px', width: 36, height: 36, borderWidth: 3 }} />
+              <p style={{ fontWeight: 600, fontSize: 'var(--text-base)' }}>{progress}</p>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 8 }}>
+                ระบบกำลังสร้างเวกเตอร์และบันทึกลงฐานข้อมูล... กรุณารอสักครู่
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+              {/* Status Summary Banner */}
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  background: importedCount === GSL_PRESETS.length ? '#ecfdf5' : 'var(--color-bg-tertiary)',
+                  border: `1px solid ${importedCount === GSL_PRESETS.length ? '#a7f3d0' : 'var(--color-border)'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-xs)' }}>
+                  <span style={{ fontWeight: 700, color: importedCount === GSL_PRESETS.length ? '#047857' : 'var(--color-text-primary)' }}>
+                    📊 สถานะ: นำเข้าสู่ระบบแล้ว {importedCount} จากทั้งหมด {GSL_PRESETS.length} หัวข้อ
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {unimportedCount > 0 && (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={selectOnlyUnimported}
+                      style={{ fontSize: '0.7rem', padding: '2px 8px', height: 'auto' }}
+                    >
+                      เลือกเฉพาะที่ยังไม่นำเข้า ({unimportedCount})
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={selectAll}
+                    style={{ fontSize: '0.7rem', padding: '2px 8px', height: 'auto' }}
+                  >
+                    เลือกทั้งหมด
+                  </button>
+                  {selectedCount > 0 && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={clearSelection}
+                      style={{ fontSize: '0.7rem', padding: '2px 8px', height: 'auto', color: 'var(--color-text-muted)' }}
+                    >
+                      ล้างการเลือก
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Presets List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {GSL_PRESETS.map((preset) => {
+                  const isImported = checkIsImported(preset.title);
+                  const isSelected = !!selected[preset.id];
+
+                  return (
+                    <div
+                      key={preset.id}
+                      style={{
+                        border: `1.5px solid ${
+                          isSelected
+                            ? 'var(--color-primary)'
+                            : isImported
+                            ? '#a7f3d0'
+                            : 'var(--color-border)'
+                        }`,
+                        borderRadius: 'var(--radius-md)',
+                        overflow: 'hidden',
+                        background: isSelected
+                          ? 'var(--color-primary-soft)'
+                          : isImported
+                          ? '#f0fdf4'
+                          : 'var(--color-bg-secondary)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '0.625rem 0.875rem',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => toggleSelect(preset.id)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(preset.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            width: 16,
+                            height: 16,
+                            accentColor: 'var(--color-primary)',
+                            flexShrink: 0,
+                            cursor: 'pointer',
+                          }}
+                        />
+
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: isSelected ? 700 : 500, fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)' }}>
+                            {preset.title}
+                          </span>
+
+                          {/* Imported status badge */}
+                          {isImported ? (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                background: '#ecfdf5',
+                                color: '#047857',
+                                border: '1px solid #a7f3d0',
+                              }}
+                            >
+                              <Check size={12} strokeWidth={3} /> นำเข้าข้อมูลแล้ว
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                fontSize: '0.7rem',
+                                fontWeight: 500,
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                background: 'var(--color-bg-tertiary)',
+                                color: 'var(--color-text-muted)',
+                              }}
+                            >
+                              ยังไม่ได้นำเข้า
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-icon btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpanded(expanded === preset.id ? null : preset.id);
+                          }}
+                          title="ดูตัวอย่างเนื้อหา"
+                          style={{ flexShrink: 0 }}
+                        >
+                          {expanded === preset.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                      </div>
+
+                      {expanded === preset.id && (
+                        <div
+                          style={{
+                            padding: '0.75rem 0.875rem',
+                            fontSize: 'var(--text-xs)',
+                            color: 'var(--color-text-secondary)',
+                            whiteSpace: 'pre-wrap',
+                            lineHeight: 1.7,
+                            borderTop: '1px solid var(--color-border)',
+                            background: '#ffffff',
+                            maxHeight: 180,
+                            overflowY: 'auto',
+                          }}
+                        >
+                          {preset.content}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {error && (
+                <div style={{ color: 'var(--color-danger)', fontSize: 'var(--text-sm)', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <AlertTriangle size={14} /> {error}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {!processing && (
+          <div className="modal-footer">
+            <button className="btn btn-ghost" onClick={onClose}>
+              ยกเลิก
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleImport}
+              disabled={selectedCount === 0}
+            >
+              <Sparkles size={16} />
+              {selectedCount > 0 ? `นำเข้าที่เลือก (${selectedCount} หัวข้อ)` : 'เลือกหัวข้อเพื่อนำเข้า'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Configure pdfjs worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -27,6 +474,7 @@ export default function KnowledgeBase() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showPreset, setShowPreset] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -91,11 +539,16 @@ export default function KnowledgeBase() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <Upload size={18} />
-          เพิ่มเอกสาร
-        </button>
+        <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+          <button className="btn btn-secondary" onClick={() => setShowPreset(true)}>
+            <Sparkles size={18} />
+            นำเข้าองค์ความรู้ กยศ.
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <Upload size={18} />
+            เพิ่มเอกสาร
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -171,6 +624,20 @@ export default function KnowledgeBase() {
             loadDocuments();
           }}
           onClose={() => setShowModal(false)}
+        />
+      )}
+
+      {/* Preset Import Modal */}
+      {showPreset && (
+        <PresetModal
+          userId={user?.id}
+          existingDocuments={documents}
+          onSuccess={() => {
+            setShowPreset(false);
+            showToast('นำเข้าองค์ความรู้ กยศ. สำเร็จ!');
+            loadDocuments();
+          }}
+          onClose={() => setShowPreset(false)}
         />
       )}
 

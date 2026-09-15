@@ -13,6 +13,7 @@ import {
   HelpCircle,
   Megaphone,
   CalendarDays,
+  Layers,
 } from 'lucide-react';
 
 export default function Layout({ children }) {
@@ -88,6 +89,14 @@ export default function Layout({ children }) {
             แชทใหม่
           </NavLink>
           <NavLink
+            to="/knowledge"
+            className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+            onClick={closeSidebar}
+          >
+            <BookOpen size={20} />
+            องค์ความรู้ กยศ.
+          </NavLink>
+          <NavLink
             to="/faqs"
             className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
             onClick={closeSidebar}
@@ -128,12 +137,20 @@ export default function Layout({ children }) {
                 แดชบอร์ด
               </NavLink>
               <NavLink
-                to="/admin/knowledge-base"
+                to="/admin/knowledge"
                 className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
                 onClick={closeSidebar}
               >
                 <BookOpen size={20} />
-                ฐานความรู้
+                จัดการองค์ความรู้
+              </NavLink>
+              <NavLink
+                to="/admin/knowledge-base"
+                className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+                onClick={closeSidebar}
+              >
+                <Layers size={20} />
+                ฐานข้อมูล AI
               </NavLink>
               <NavLink
                 to="/admin/faqs"

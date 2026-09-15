@@ -5,14 +5,6 @@ import { sendChatMessage, getChatById, rateChatResponse } from '../lib/chatApi';
 import { Send, AlertTriangle, Bot, Sparkles, Star } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
-const SUGGESTIONS = [
-  'คุณสมบัติผู้กู้ กยศ. มีอะไรบ้าง?',
-  'ต้องเตรียมเอกสารอะไรบ้าง?',
-  'ขั้นตอนการกู้ยืมผ่านระบบ DSL',
-  'ช่องทางชำระหนี้ กยศ.',
-  'กยศ. คิดดอกเบี้ยเท่าไร?',
-  'ติดต่องาน กยศ. มทร.ศรีวิชัย',
-];
 
 export default function ChatPage() {
   const { user, profile } = useAuth();
@@ -172,17 +164,6 @@ export default function ChatPage() {
               ผมคือแชทบอท กยศ. พร้อมช่วยตอบคำถามเกี่ยวกับกองทุนเงินให้กู้ยืมเพื่อการศึกษา
               สำหรับนักศึกษา มทร.ศรีวิชัย
             </p>
-            <div className="chat-suggestions">
-              {SUGGESTIONS.map((suggestion, i) => (
-                <button
-                  key={i}
-                  className="chat-suggestion-btn"
-                  onClick={() => handleSend(suggestion)}
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
           </div>
         )}
 

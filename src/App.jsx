@@ -9,11 +9,13 @@ import LoginPage from './pages/LoginPage';
 import ChatPage from './pages/ChatPage';
 
 // Lazy load secondary and heavy admin pages (e.g. pdfjs-dist, xlsx)
+const KnowledgePage = lazy(() => import('./pages/KnowledgePage'));
 const FAQPage = lazy(() => import('./pages/FAQPage'));
 const NewsPage = lazy(() => import('./pages/NewsPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminKnowledge = lazy(() => import('./pages/admin/AdminKnowledge'));
 const KnowledgeBase = lazy(() => import('./pages/admin/KnowledgeBase'));
 const AdminFaq = lazy(() => import('./pages/admin/AdminFaq'));
 const AdminNews = lazy(() => import('./pages/admin/AdminNews'));
@@ -43,6 +45,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <ChatPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/knowledge"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <KnowledgePage />
                   </Layout>
                 </ProtectedRoute>
               }
@@ -87,6 +99,16 @@ function App() {
                 <ProtectedRoute requireAdmin>
                   <Layout>
                     <AdminDashboard />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/knowledge"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <Layout>
+                    <AdminKnowledge />
                   </Layout>
                 </ProtectedRoute>
               }

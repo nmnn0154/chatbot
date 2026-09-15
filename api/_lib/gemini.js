@@ -47,20 +47,44 @@ export function buildSystemInstruction(contextChunks = []) {
   return prompt;
 }
 
+export const FALLBACK_CHAT_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-flash-latest',
+  'gemini-3.6-flash',
+];
+
 /**
  * Generate a chat completion grounded on the given context chunks.
  * @returns {Promise<string>} the model's text response
  */
 export async function generateChatResponse(message, contextChunks = []) {
   const genAI = getClient();
-  const model = genAI.getGenerativeModel({ model: chatModel() });
+  const primary = chatModel();
+  const modelsToTry = [primary, ...FALLBACK_CHAT_MODELS.filter(m => m !== primary)];
+  const systemInstruction = buildSystemInstruction(contextChunks);
+  const contents = [{ role: 'user', parts: [{ text: message.trim() }] }];
 
-  const result = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: message.trim() }] }],
-    systemInstruction: buildSystemInstruction(contextChunks),
-  });
+  let lastError = null;
+  for (const modelName of modelsToTry) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent({
+        contents,
+        systemInstruction,
+      });
+      return result.response.text();
+    } catch (err) {
+      console.warn(`[Gemini] Model ${modelName} failed:`, err.message);
+      lastError = err;
+      // If it's not a temporary error (like invalid prompt), but 503/429/404, continue to next fallback
+      if (err?.status === 400 && !err?.message?.includes('model')) {
+        throw err;
+      }
+    }
+  }
 
-  return result.response.text();
+  throw lastError || new Error('Failed to generate response from all available AI models');
 }
 
 /**
