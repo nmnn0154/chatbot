@@ -16,8 +16,6 @@ import {
   Layers,
   ShieldCheck,
 } from 'lucide-react';
-import AdminSubNav from './admin/AdminSubNav';
-import BottomNav from './BottomNav';
 
 function getPageTitle(pathname) {
   if (pathname === '/chat') return 'กยศ. Chatbot';
@@ -300,7 +298,6 @@ export default function Layout({ children }) {
 
       {/* Main Content */}
       <main className="main-content">
-        {isAdmin && location.pathname.startsWith('/admin') && <AdminSubNav />}
         {children}
         {location.pathname !== '/chat' && (
           <footer className="app-footer">
@@ -316,9 +313,6 @@ export default function Layout({ children }) {
           </footer>
         )}
       </main>
-
-      {/* Mobile Bottom Navigation */}
-      <BottomNav isAdmin={isAdmin} />
     </div>
   );
 }
