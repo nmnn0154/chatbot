@@ -376,13 +376,14 @@ export default function KnowledgePage() {
           <p
             style={{
               color: 'rgba(255, 255, 255, 0.9)',
-              fontSize: 'clamp(0.85rem, 1.8vw, 0.95rem)',
+              fontSize: 'clamp(0.85rem, 0.8vw, 0.7rem)',
               margin: '0 0 var(--space-lg)',
-              lineHeight: 1.6,
-              fontWeight: 400,
+              lineHeight: 1.,
+              fontWeight: 500,
             }}
           >
-            รวมระเบียบและแนวทางกู้ยืมเพื่อการศึกษาฉบับสมบูรณ์ — ตรวจสอบคุณสมบัติ เอกสารที่ต้องใช้ ขั้นตอนระบบ DSL อัตราวงเงิน และการชำระหนี้คืน ครบจบในที่เดียว
+            รวมระเบียบและแนวทางกู้ยืมเพื่อการศึกษาฉบับสมบูรณ์ — ตรวจสอบคุณสมบัติ เอกสารที่ต้องใช้ ขั้นตอนระบบ DSL อัตราวงเงิน <br></br>
+            และการชำระหนี้คืน ครบจบในที่เดียว
           </p>
 
           {/* Integrated Clean Search Bar */}
