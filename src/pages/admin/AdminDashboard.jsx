@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { downloadCsv } from '../../lib/csv';
+import ExportCenterModal from '../../components/admin/ExportCenterModal';
 import {
   BookOpen,
   MessageSquare,
@@ -15,13 +15,11 @@ import {
   Star,
   Clock,
   RefreshCw,
-  Sparkles,
   ShieldCheck,
   Megaphone,
-  CheckCircle2,
   BarChart3,
-  Calendar,
   Layers,
+  AlertTriangle,
 } from 'lucide-react';
 
 /* ─── Modern SVG Bar Chart ──────────────────────────────────── */
@@ -290,6 +288,13 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportInitialReport, setExportInitialReport] = useState('detailed_chats');
+
+  const openExportModal = (reportType = 'detailed_chats') => {
+    setExportInitialReport(reportType);
+    setIsExportModalOpen(true);
+  };
 
   const toggleExpand = (id) => setExpandedId(expandedId === id ? null : id);
 
@@ -429,21 +434,6 @@ export default function AdminDashboard() {
     }
   }
 
-  async function exportChatHistoriesCsv() {
-    const { data } = await supabase
-      .from('chat_histories')
-      .select('created_at, user_message, bot_response, rating')
-      .order('created_at', { ascending: false })
-      .limit(5000);
-
-    downloadCsv('chat_histories', (data || []).map((c) => ({
-      วันที่: new Date(c.created_at).toLocaleString('th-TH'),
-      คำถามผู้ใช้: c.user_message,
-      คำตอบบอท: c.bot_response,
-      คะแนนดาว: c.rating ?? '',
-    })));
-  }
-
   if (loading) {
     return (
       <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -469,7 +459,7 @@ export default function AdminDashboard() {
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', color: 'var(--color-primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
             <ShieldCheck size={14} /> ผู้ดูแลระบบส่วนกลาง
           </div>
-          <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, margin: 0, color: 'var(--color-text-primary)' }}>
+          <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, var(--text-2xl))', fontWeight: 800, margin: 0, color: 'var(--color-text-primary)' }}>
             แดชบอร์ดภาพรวมระบบ
           </h1>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>
@@ -477,7 +467,7 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="admin-header-actions">
           <button
             className="btn btn-ghost btn-sm"
             onClick={loadDashboardData}
@@ -491,10 +481,11 @@ export default function AdminDashboard() {
 
           <button
             className="btn btn-primary btn-sm"
-            onClick={exportChatHistoriesCsv}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            onClick={() => openExportModal('detailed_chats')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}
+            title="เปิดศูนย์ส่งออกรายงาน CSV ครบวงจร"
           >
-            <FileDown size={14} /> ส่งออกรายงาน CSV
+            <FileDown size={15} /> ศูนย์ส่งออกรายงาน CSV
           </button>
         </div>
       </div>
@@ -722,14 +713,14 @@ export default function AdminDashboard() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
           gap: 'var(--space-md)',
           marginBottom: 'var(--space-lg)',
         }}
       >
         {/* Left Chart: Weekly Chat Volume */}
         <div className="card" style={{ padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: 'var(--space-md)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ padding: '6px', borderRadius: 'var(--radius-sm)', background: 'var(--color-primary-soft)', color: 'var(--color-primary)' }}>
                 <BarChart3 size={18} />
@@ -743,8 +734,18 @@ export default function AdminDashboard() {
                 </span>
               </div>
             </div>
-            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary-soft)', padding: '2px 8px', borderRadius: 'var(--radius-sm)' }}>
-              รวม {stats.weeklyChats} ครั้ง
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary-soft)', padding: '2px 8px', borderRadius: 'var(--radius-sm)' }}>
+                รวม {stats.weeklyChats} ครั้ง
+              </div>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => openExportModal('daily_kpi')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)', padding: '4px 8px' }}
+                title="ส่งออกสถิติและ KPI รายวันเป็น CSV"
+              >
+                <FileDown size={13} /> สถิติรายวัน
+              </button>
             </div>
           </div>
 
@@ -753,7 +754,7 @@ export default function AdminDashboard() {
 
         {/* Right Chart: Satisfaction Rating Breakdown */}
         <div className="card" style={{ padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: 'var(--space-md)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ padding: '6px', borderRadius: 'var(--radius-sm)', background: '#fefce8', color: '#ca8a04' }}>
                 <Star size={18} />
@@ -767,6 +768,14 @@ export default function AdminDashboard() {
                 </span>
               </div>
             </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => openExportModal('low_rating_audit')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)', color: '#dc2626' }}
+              title="ส่งออกรายการที่ได้คะแนน 1-2 ดาวเพื่อตรวจสอบ"
+            >
+              <AlertTriangle size={13} /> เคสต้องปรับปรุง
+            </button>
           </div>
 
           <ModernDonutChart data={ratingDist} avgRating={stats.avgRating} />
@@ -777,25 +786,35 @@ export default function AdminDashboard() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
           gap: 'var(--space-md)',
           marginBottom: 'var(--space-lg)',
         }}
       >
         {/* Frequent Questions Box */}
         <div className="card" style={{ padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-md)' }}>
-            <div style={{ padding: '6px', borderRadius: 'var(--radius-sm)', background: '#e0f2fe', color: '#0284c7' }}>
-              <HelpCircle size={18} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: 'var(--space-md)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ padding: '6px', borderRadius: 'var(--radius-sm)', background: '#e0f2fe', color: '#0284c7' }}>
+                <HelpCircle size={18} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+                  คำถามที่ผู้ใช้ถามบ่อยที่สุด
+                </h3>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                  จัดอันดับตามความถี่การสอบถาม
+                </span>
+              </div>
             </div>
-            <div>
-              <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
-                คำถามที่ผู้ใช้ถามบ่อยที่สุด
-              </h3>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                จัดอันดับตามความถี่การสอบถาม
-              </span>
-            </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => openExportModal('frequent_questions')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)' }}
+              title="ส่งออกรายงานการจัดอันดับคำถามยอดนิยมเป็น CSV"
+            >
+              <FileDown size={14} /> ส่งออก CSV
+            </button>
           </div>
 
           {frequentQuestions.length === 0 ? (
@@ -913,7 +932,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: '10px' }}>
             <Link
               to="/admin/knowledge"
               className="card card-glow"
@@ -1032,7 +1051,7 @@ export default function AdminDashboard() {
       {/* ── Row 4: Recent Activity Stream ── */}
       {recentActivity.length > 0 && (
         <div className="card" style={{ padding: 'var(--space-lg)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: 'var(--space-md)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ padding: '6px', borderRadius: 'var(--radius-sm)', background: 'var(--color-primary-soft)', color: 'var(--color-primary)' }}>
                 <Clock size={18} />
@@ -1046,9 +1065,19 @@ export default function AdminDashboard() {
                 </span>
               </div>
             </div>
-            <Link to="/chat" className="btn btn-ghost btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)' }}>
-              ทดสอบแชท <ArrowRight size={14} />
-            </Link>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => openExportModal('detailed_chats')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)' }}
+                title="ส่งออกประวัติการสนทนาฉบับละเอียดเป็น CSV"
+              >
+                <FileDown size={14} /> ส่งออก CSV
+              </button>
+              <Link to="/chat" className="btn btn-ghost btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)' }}>
+                ทดสอบแชท <ArrowRight size={14} />
+              </Link>
+            </div>
           </div>
 
           <div className="table-wrapper" style={{ overflowX: 'auto' }}>
@@ -1090,6 +1119,12 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+      {/* ── Export Center Modal ── */}
+      <ExportCenterModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        initialReport={exportInitialReport}
+      />
     </div>
   );
 }

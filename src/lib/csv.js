@@ -1,15 +1,19 @@
 /**
- * Minimal CSV export helper. Prepends a UTF-8 BOM so Excel opens Thai correctly.
+ * Robust CSV export helper. Prepends a UTF-8 BOM so Excel opens Thai correctly.
  */
 export function downloadCsv(filename, rows) {
-  if (!rows || rows.length === 0) return;
+  if (!rows || rows.length === 0) return false;
   const headers = Object.keys(rows[0]);
   const escape = (v) => {
-    const s = v === null || v === undefined ? '' : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    if (/[",\n\r]/.test(s)) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
   };
   const body = rows.map((r) => headers.map((h) => escape(r[h])).join(',')).join('\r\n');
-  const csv = '﻿' + headers.join(',') + '\r\n' + body;
+  const csv = '\uFEFF' + headers.map((h) => escape(h)).join(',') + '\r\n' + body;
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -20,4 +24,6 @@ export function downloadCsv(filename, rows) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+  return true;
 }
+
