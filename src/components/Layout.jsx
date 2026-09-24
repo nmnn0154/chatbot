@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getChatHistory } from '../lib/chatApi';
+import { getChatHistory, deleteChatFromLocal, clearAllChatHistory } from '../lib/chatApi';
 import {
   MessageSquare,
   LayoutDashboard,
   BookOpen,
   History,
+  Trash2,
   LogOut,
   Menu,
   X,
@@ -15,6 +16,9 @@ import {
   CalendarDays,
   Layers,
   ShieldCheck,
+  GraduationCap,
+  Phone,
+  Globe,
 } from 'lucide-react';
 
 function getPageTitle(pathname) {
@@ -58,6 +62,32 @@ export default function Layout({ children }) {
   const handleSignOut = async () => {
     await signOut();
     navigate('/login');
+  };
+
+  const handleDeleteChat = (e, chatId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    deleteChatFromLocal(chatId, profile?.id);
+    const updated = getChatHistory(profile?.id);
+    setRecentChats(updated);
+    window.dispatchEvent(new Event('chatHistoryUpdated'));
+
+    if (currentChatId === chatId) {
+      navigate('/chat');
+    }
+  };
+
+  const handleClearAllHistory = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm('คุณต้องการล้างประวัติการสนทนาทั้งหมดใช่หรือไม่?')) {
+      clearAllChatHistory(profile?.id);
+      setRecentChats([]);
+      window.dispatchEvent(new Event('chatHistoryUpdated'));
+      if (currentChatId) {
+        navigate('/chat');
+      }
+    }
   };
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -199,24 +229,55 @@ export default function Layout({ children }) {
           {recentChats.length > 0 && (
             <>
               <div className="sidebar-divider" />
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', padding: '0.5rem 0.75rem', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                หัวข้อที่เคยคุย
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.5rem 0.75rem',
+              }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                  หัวข้อที่เคยคุย
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearAllHistory}
+                  className="sidebar-clear-all-btn"
+                  title="ล้างประวัติการสนทนาทั้งหมด"
+                >
+                  ล้างทั้งหมด
+                </button>
               </div>
               <div className="sidebar-history-list" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {recentChats.map(chat => (
-                  <Link
-                    key={chat.id}
-                    to={`/chat?id=${chat.id}`}
-                    className={`sidebar-nav-link ${currentChatId === chat.id ? 'active' : ''}`}
-                    onClick={closeSidebar}
-                    style={{ padding: '0.4rem 0.75rem', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '8px' }}
-                  >
-                    <History size={16} />
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {chat.user_message.length > 25 ? chat.user_message.substring(0, 25) + '...' : chat.user_message}
-                    </span>
-                  </Link>
-                ))}
+                {recentChats.map(chat => {
+                  const isActive = currentChatId === chat.id;
+                  return (
+                    <div
+                      key={chat.id}
+                      className={`sidebar-history-item ${isActive ? 'active' : ''}`}
+                    >
+                      <Link
+                        to={`/chat?id=${chat.id}`}
+                        className="sidebar-history-link"
+                        onClick={closeSidebar}
+                        title={chat.user_message}
+                      >
+                        <History size={16} />
+                        <span className="sidebar-history-text">
+                          {chat.user_message.length > 25 ? chat.user_message.substring(0, 25) + '...' : chat.user_message}
+                        </span>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteChat(e, chat.id)}
+                        className="sidebar-history-delete-btn"
+                        title="ลบแชทนี้"
+                        aria-label="ลบแชทนี้"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}
@@ -232,13 +293,17 @@ export default function Layout({ children }) {
               )}
             </div>
             <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{profile?.full_name || 'ผู้ใช้'}</div>
+              <div className="sidebar-user-name" title={profile?.full_name || 'ผู้ใช้'}>
+                {profile?.full_name || 'ผู้ใช้'}
+              </div>
               <div className="sidebar-user-role">
-                {isAdmin ? '👑 ผู้ดูแลระบบ' : '👤 ผู้ใช้'}
+                <span className={`sidebar-role-badge ${isAdmin ? 'admin' : 'user'}`}>
+                  {isAdmin ? 'ผู้ดูแลระบบ / บุคลากร' : 'ผู้ใช้ / นักศึกษา'}
+                </span>
               </div>
             </div>
             <button
-              className="btn btn-ghost btn-icon"
+              className="btn btn-ghost btn-icon sidebar-logout-btn"
               onClick={handleSignOut}
               title="ออกจากระบบ"
               aria-label="ออกจากระบบ"
@@ -301,15 +366,28 @@ export default function Layout({ children }) {
         {children}
         {location.pathname !== '/chat' && (
           <footer className="app-footer">
-            <span>
-              <strong>กองพัฒนานักศึกษา</strong> มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย
-            </span>
-            <span>
-              กยศ. Call Center 0-2016-4888 ·{' '}
-              <a href="https://www.rmutsv.ac.th" target="_blank" rel="noreferrer">
-                www.rmutsv.ac.th
+            <div className="app-footer-left">
+              <GraduationCap size={16} className="app-footer-icon" />
+              <span>
+                <strong>กองพัฒนานักศึกษา</strong> มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย
+              </span>
+            </div>
+            <div className="app-footer-right">
+              <span className="app-footer-contact">
+                <Phone size={13} />
+                <span>กยศ. Call Center 0-2016-4888</span>
+              </span>
+              <span className="app-footer-divider">•</span>
+              <a
+                href="https://www.rmutsv.ac.th"
+                target="_blank"
+                rel="noreferrer"
+                className="app-footer-link"
+              >
+                <Globe size={13} />
+                <span>www.rmutsv.ac.th</span>
               </a>
-            </span>
+            </div>
           </footer>
         )}
       </main>

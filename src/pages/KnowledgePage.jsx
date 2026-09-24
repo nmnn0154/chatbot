@@ -330,123 +330,216 @@ export default function KnowledgePage() {
 
   return (
     <div className="page-container animate-fade-in" id="gsl-knowledge-page" style={{ maxWidth: 1140, margin: '0 auto', paddingBottom: '3rem' }}>
-      {/* ── Dignified Unified Hero Header ── */}
+      {/* ── Modern Premium Hero Header ── */}
       <div
         style={{
-          background: 'var(--color-primary, #1e3a8a)',
+          position: 'relative',
+          overflow: 'hidden',
+          background: 'radial-gradient(ellipse 90% 70% at 85% 15%, rgba(56, 189, 248, 0.22), transparent 50%), radial-gradient(circle at 10% 85%, rgba(99, 102, 241, 0.25), transparent 45%), linear-gradient(135deg, #061539 0%, #0d276b 35%, #1e3a8a 70%, #1e40af 100%)',
           color: '#ffffff',
-          borderRadius: 'var(--radius-xl, 12px)',
-          padding: 'clamp(24px, 4vw, 36px) clamp(20px, 3.5vw, 32px)',
+          borderRadius: '24px',
+          padding: 'clamp(28px, 4.5vw, 42px) clamp(24px, 4vw, 40px)',
           marginBottom: 'var(--space-lg)',
-          boxShadow: '0 4px 16px rgba(30, 58, 138, 0.14)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 20px 45px -12px rgba(10, 25, 60, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.16)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.35)',
         }}
       >
-        <div style={{ maxWidth: 840 }}>
+        {/* Decorative Luxury Geometric Ring & Ambient Light in Background */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '-60px',
+            right: '-60px',
+            width: '360px',
+            height: '360px',
+            borderRadius: '50%',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: '0 0 100px rgba(56, 189, 248, 0.18)',
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              inset: '35px',
+              borderRadius: '50%',
+              border: '1px dashed rgba(255, 255, 255, 0.06)',
+            }}
+          />
+        </div>
+
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 1040 }}>
+          {/* Badge */}
           <div
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '8px',
-              background: 'rgba(255, 255, 255, 0.14)',
-              padding: '4px 12px',
-              borderRadius: 'var(--radius-full)',
+              gap: '9px',
+              background: 'rgba(255, 255, 255, 0.09)',
+              backdropFilter: 'blur(16px)',
+              padding: '6px 16px',
+              borderRadius: '9999px',
               fontSize: 'var(--text-xs)',
               fontWeight: 600,
-              letterSpacing: '0.3px',
-              marginBottom: 'var(--space-sm)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
+              letterSpacing: '0.4px',
+              marginBottom: '14px',
+              border: '1px solid rgba(255, 255, 255, 0.22)',
+              boxShadow: '0 4px 14px rgba(0, 0, 0, 0.12)',
             }}
           >
-            <GraduationCap size={15} /> กองพัฒนานักศึกษา มทร.ศรีวิชัย · ศูนย์ข้อมูล กยศ.
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: '#38bdf8',
+                boxShadow: '0 0 10px #38bdf8',
+                display: 'inline-block',
+              }}
+            />
+            <GraduationCap size={16} style={{ color: '#93c5fd' }} />
+            <span style={{ color: '#f0f9ff' }}>กองพัฒนานักศึกษา มทร.ศรีวิชัย · ศูนย์ข้อมูล กยศ.</span>
           </div>
 
+          {/* Title with metallic text gradient */}
           <h1
             style={{
-              color: '#ffffff',
-              fontSize: 'clamp(1.5rem, 4vw, 2.2rem)',
+              background: 'linear-gradient(180deg, #ffffff 40%, #e0e7ff 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              fontSize: 'clamp(1.85rem, 4vw, 2.45rem)',
               fontWeight: 800,
-              margin: '0 0 var(--space-xs)',
-              lineHeight: 1.3,
+              margin: '0 0 10px',
+              lineHeight: 1.22,
+              letterSpacing: '-0.02em',
+              filter: 'drop-shadow(0 2px 8px rgba(0, 0, 0, 0.25))',
             }}
           >
             องค์ความรู้และคู่มือ กยศ.
           </h1>
 
+          {/* Subtitle - Single Line Guaranteed on Desktop & Responsive */}
           <p
-            style={{
-              color: 'rgba(255, 255, 255, 0.9)',
-              fontSize: 'clamp(0.85rem, 0.8vw, 0.7rem)',
-              margin: '0 0 var(--space-lg)',
-              lineHeight: 1.,
-              fontWeight: 500,
-            }}
+            className="hero-subtitle-singleline"
+            title="รวมระเบียบและแนวทางกู้ยืมเพื่อการศึกษาฉบับสมบูรณ์ — ตรวจสอบคุณสมบัติ เอกสารที่ต้องใช้ ขั้นตอนระบบ DSL อัตราวงเงิน และการชำระหนี้คืน ครบจบในที่เดียว"
           >
-            รวมระเบียบและแนวทางกู้ยืมเพื่อการศึกษาฉบับสมบูรณ์ — ตรวจสอบคุณสมบัติ เอกสารที่ต้องใช้ ขั้นตอนระบบ DSL อัตราวงเงิน <br></br>
-            และการชำระหนี้คืน ครบจบในที่เดียว
+            รวมระเบียบและแนวทางกู้ยืมเพื่อการศึกษาฉบับสมบูรณ์ — ตรวจสอบคุณสมบัติ เอกสารที่ต้องใช้ ขั้นตอนระบบ DSL อัตราวงเงิน และการชำระหนี้คืน ครบจบในที่เดียว
           </p>
 
-          {/* Integrated Clean Search Bar */}
+          {/* Integrated Clean Luxury Search Bar */}
           <div
             style={{
               position: 'relative',
-              maxWidth: 620,
-              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.12)',
-              borderRadius: 'var(--radius-md, 8px)',
-              overflow: 'hidden',
+              maxWidth: 660,
+              boxShadow: '0 14px 32px -4px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.3)',
+              borderRadius: '16px',
+              background: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
             }}
           >
-            <Search
-              size={18}
+            <div
               style={{
                 position: 'absolute',
                 left: 14,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--color-primary, #1e3a8a)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 32,
+                height: 32,
+                borderRadius: '10px',
+                background: 'rgba(37, 99, 235, 0.08)',
+                color: '#2563eb',
               }}
-            />
+            >
+              <Search size={18} />
+            </div>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ค้นหาหัวข้อที่ต้องการ เช่น คุณสมบัติ, เอกสาร, กรอ., กยศ...."
+              placeholder="ค้นหาหัวข้อที่ต้องการ เช่น คุณสมบัติ, เอกสาร"
               style={{
                 width: '100%',
-                height: 48,
-                paddingLeft: 44,
-                paddingRight: searchQuery ? 40 : 16,
-                fontSize: 'var(--text-sm)',
-                borderRadius: 'var(--radius-md, 8px)',
+                height: 54,
+                paddingLeft: 56,
+                paddingRight: searchQuery ? 44 : 96,
+                fontSize: '0.95rem',
+                borderRadius: '16px',
                 border: 'none',
-                background: '#ffffff',
-                color: 'var(--color-text-primary, #1a2434)',
+                background: 'transparent',
+                color: '#0f172a',
                 outline: 'none',
                 fontWeight: 500,
               }}
             />
-            {searchQuery && (
+            {searchQuery ? (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
                 style={{
                   position: 'absolute',
-                  right: 10,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
+                  right: 12,
+                  background: 'rgba(0, 0, 0, 0.06)',
                   border: 'none',
-                  color: 'var(--color-text-muted, #6b7688)',
+                  borderRadius: '50%',
+                  color: '#64748b',
                   cursor: 'pointer',
-                  padding: 6,
+                  width: 30,
+                  height: 30,
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
                 }}
                 title="ล้างคำค้นหา"
               >
-                <X size={16} />
+                <X size={15} />
               </button>
+            ) : (
+              <span
+                style={{
+                  position: 'absolute',
+                  right: 14,
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  color: 'var(--color-primary, #1e3a8a)',
+                  background: 'var(--color-primary-soft, #eef2fb)',
+                  padding: '4px 10px',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(30, 58, 138, 0.1)',
+                  pointerEvents: 'none',
+                }}
+              >
+                {filteredItems.length} หัวข้อ
+              </span>
             )}
+          </div>
+
+          {/* Quick Popular Keyword Chips (Luxury Touch) */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '6px',
+              marginTop: '12px',
+            }}
+          >
+            {/* <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', marginRight: '2px' }}>
+              คำค้นยอดนิยม:
+            </span> */}
+            {/* {['คุณสมบัติ', 'เอกสาร', 'ขั้นตอน DSL', 'วงเงินกู้ยืม', 'ชำระหนี้'].map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setSearchQuery(tag)}
+                className="hero-luxury-chip"
+              >
+                {tag}
+              </button>
+            ))} */}
           </div>
         </div>
       </div>
@@ -455,26 +548,113 @@ export default function KnowledgePage() {
       <div
         className="card"
         style={{
-          padding: '12px 16px',
+          padding: '16px 20px',
           marginBottom: 'var(--space-lg)',
           background: 'var(--color-bg-secondary, #ffffff)',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '12px',
+          flexDirection: 'column',
+          gap: '14px',
           border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-lg, 10px)',
+          borderRadius: '16px',
+          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
         }}
       >
-        {/* Category Filter Pills (Wrap to show all categories cleanly on desktop) */}
+        {/* Top bar: Category Title & Counter + View Mode Switcher */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px',
+            paddingBottom: '12px',
+            borderBottom: '1px solid var(--color-border)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+              หมวดหมู่เนื้อหา
+            </span>
+            <span
+              style={{
+                fontSize: 'var(--text-xs)',
+                fontWeight: 600,
+                color: 'var(--color-primary)',
+                background: 'var(--color-primary-soft, #eef2fb)',
+                padding: '2px 8px',
+                borderRadius: '12px',
+              }}
+            >
+              แสดง {filteredItems.length} รายการ
+            </span>
+          </div>
+
+          {/* View Mode Toggle Buttons */}
+          <div
+            style={{
+              display: 'inline-flex',
+              background: 'var(--color-bg-primary, #f1f5f9)',
+              padding: '3px',
+              borderRadius: '10px',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer',
+                background: viewMode === 'grid' ? 'var(--color-primary, #1e3a8a)' : 'transparent',
+                color: viewMode === 'grid' ? '#ffffff' : 'var(--color-text-secondary)',
+                boxShadow: viewMode === 'grid' ? '0 2px 6px rgba(30, 58, 138, 0.25)' : 'none',
+                transition: 'all 0.18s ease',
+              }}
+              title="มุมมองการ์ดความรู้"
+            >
+              <LayoutGrid size={14} />
+              <span>การ์ดความรู้</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('accordion')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer',
+                background: viewMode === 'accordion' ? 'var(--color-primary, #1e3a8a)' : 'transparent',
+                color: viewMode === 'accordion' ? '#ffffff' : 'var(--color-text-secondary)',
+                boxShadow: viewMode === 'accordion' ? '0 2px 6px rgba(30, 58, 138, 0.25)' : 'none',
+                transition: 'all 0.18s ease',
+              }}
+              title="มุมมองรายการย่อ-ขยาย"
+            >
+              <List size={14} />
+              <span>รายการย่อขยาย</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Category Filter Pills (Wrap cleanly without pushing the view switcher away) */}
         <div
           style={{
             display: 'flex',
             flexWrap: 'wrap',
             gap: '8px',
             alignItems: 'center',
-            flex: '1 1 auto',
           }}
         >
           {KNOWLEDGE_CATEGORIES.map((cat) => {
@@ -488,32 +668,41 @@ export default function KnowledgePage() {
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
+                className={`knowledge-cat-pill ${isSelected ? 'active' : ''}`}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 12px',
-                  borderRadius: 'var(--radius-md, 6px)',
-                  fontSize: 'var(--text-xs)',
+                  gap: '7px',
+                  padding: '7px 14px',
+                  borderRadius: '9999px',
+                  fontSize: '0.82rem',
                   fontWeight: isSelected ? 700 : 500,
                   whiteSpace: 'nowrap',
                   cursor: 'pointer',
-                  border: isSelected ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
-                  background: isSelected ? 'var(--color-primary)' : 'var(--color-bg-primary)',
+                  border: isSelected ? '1px solid transparent' : '1px solid var(--color-border)',
+                  background: isSelected
+                    ? 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)'
+                    : 'var(--color-bg-primary, #f8fafc)',
                   color: isSelected ? '#ffffff' : 'var(--color-text-secondary)',
-                  transition: 'all 0.15s ease',
+                  boxShadow: isSelected ? '0 4px 12px rgba(37, 99, 235, 0.28)' : 'none',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                   flexShrink: 0,
                 }}
               >
-                <Icon size={14} />
+                <Icon size={14} style={{ color: isSelected ? '#ffffff' : 'var(--color-primary)' }} />
                 <span>{cat.label}</span>
                 <span
                   style={{
-                    fontSize: '0.65rem',
+                    fontSize: '0.7rem',
                     fontWeight: 700,
-                    padding: '1px 6px',
-                    borderRadius: '10px',
-                    background: isSelected ? 'rgba(255, 255, 255, 0.22)' : 'var(--color-bg-tertiary)',
+                    minWidth: '20px',
+                    height: '20px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '9999px',
+                    padding: '0 6px',
+                    background: isSelected ? 'rgba(255, 255, 255, 0.25)' : 'var(--color-bg-tertiary, #e2e8f0)',
                     color: isSelected ? '#ffffff' : 'var(--color-text-muted)',
                   }}
                 >
@@ -522,54 +711,6 @@ export default function KnowledgePage() {
               </button>
             );
           })}
-        </div>
-
-        {/* View Mode Toggle Buttons */}
-        <div style={{ display: 'inline-flex', background: 'var(--color-bg-primary)', padding: '2px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', flexShrink: 0, marginLeft: 'auto' }}>
-          <button
-            type="button"
-            onClick={() => setViewMode('grid')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '5px 10px',
-              borderRadius: 'var(--radius-sm)',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 600,
-              border: 'none',
-              cursor: 'pointer',
-              background: viewMode === 'grid' ? 'var(--color-primary)' : 'transparent',
-              color: viewMode === 'grid' ? '#ffffff' : 'var(--color-text-secondary)',
-              transition: 'all 0.15s ease',
-            }}
-            title="มุมมองการ์ดความรู้"
-          >
-            <LayoutGrid size={13} />
-            <span>การ์ดความรู้</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('accordion')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '5px 10px',
-              borderRadius: 'var(--radius-sm)',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 600,
-              border: 'none',
-              cursor: 'pointer',
-              background: viewMode === 'accordion' ? 'var(--color-primary)' : 'transparent',
-              color: viewMode === 'accordion' ? '#ffffff' : 'var(--color-text-secondary)',
-              transition: 'all 0.15s ease',
-            }}
-            title="มุมมองรายการย่อ-ขยาย"
-          >
-            <List size={13} />
-            <span>รายการย่อขยาย</span>
-          </button>
         </div>
       </div>
 
@@ -618,22 +759,24 @@ export default function KnowledgePage() {
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  padding: '20px',
-                  borderRadius: 'var(--radius-lg, 10px)',
+                  padding: '22px',
+                  borderRadius: '16px',
                   border: '1px solid var(--color-border)',
                   background: 'var(--color-bg-secondary, #ffffff)',
                   position: 'relative',
                   cursor: 'pointer',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                  transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease, box-shadow 0.2s ease',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = 'var(--color-primary, #1e3a8a)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(30, 58, 138, 0.08)';
+                  e.currentTarget.style.transform = 'translateY(-3px)';
+                  e.currentTarget.style.boxShadow = '0 12px 24px -4px rgba(30, 58, 138, 0.12)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.borderColor = 'var(--color-border)';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.04)';
                 }}
               >
                 {/* Card Top: Icon & Badge */}

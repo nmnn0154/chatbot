@@ -211,6 +211,37 @@ export function updateLocalChatRating(id, rating, userId = null) {
 }
 
 /**
+ * Delete a specific chat item from localStorage
+ */
+export function deleteChatFromLocal(id, userId = null) {
+  try {
+    const key = getStorageKey(userId);
+    const history = getChatHistory(userId);
+    const updated = history.filter(chat => chat.id !== id);
+    localStorage.setItem(key, JSON.stringify(updated));
+    return updated;
+  } catch (err) {
+    console.error('Failed to delete chat from local storage:', err);
+    return [];
+  }
+}
+
+/**
+ * Clear all chat history from localStorage
+ */
+export function clearAllChatHistory(userId = null) {
+  try {
+    const key = getStorageKey(userId);
+    localStorage.removeItem(key);
+    if (!userId) {
+      localStorage.removeItem(LEGACY_STORAGE_BASE);
+    }
+  } catch (err) {
+    console.error('Failed to clear chat history:', err);
+  }
+}
+
+/**
  * Get all document references (for admin)
  */
 export async function getDocuments(searchQuery = '') {

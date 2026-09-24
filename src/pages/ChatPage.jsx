@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { sendChatMessage, getChatById, rateChatResponse } from '../lib/chatApi';
-import { Send, AlertTriangle, Bot, Sparkles, Star } from 'lucide-react';
+import { sendChatMessage, getChatById, rateChatResponse, deleteChatFromLocal } from '../lib/chatApi';
+import { Send, AlertTriangle, Bot, Sparkles, Star, Trash2, Plus } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
 
@@ -142,6 +142,15 @@ export default function ChatPage() {
 
   const userInitial = profile?.full_name?.charAt(0) || 'U';
 
+  const handleDeleteCurrentChat = () => {
+    if (!chatId) return;
+    if (window.confirm('คุณต้องการลบประวัติการสนทนานี้ใช่หรือไม่?')) {
+      deleteChatFromLocal(chatId, user?.id);
+      window.dispatchEvent(new Event('chatHistoryUpdated'));
+      navigate('/chat');
+    }
+  };
+
   return (
     <div className="chat-container" id="chat-page">
       {/* Disclaimer Banner */}
@@ -151,6 +160,42 @@ export default function ChatPage() {
           ระบบนี้ให้คำแนะนำเบื้องต้นเท่านั้น ไม่สามารถเข้าถึงข้อมูลส่วนบุคคลหรือยอดหนี้ กยศ. ได้
         </span>
       </div>
+
+      {/* Active History Notice Banner */}
+      {chatId && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 16px',
+          background: 'var(--color-bg-hover)',
+          borderBottom: '1px solid var(--color-border)',
+          fontSize: 'var(--text-sm)',
+          color: 'var(--color-text-secondary)',
+        }}>
+          <span>กำลังดูประวัติการสนทนา</span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ padding: '4px 10px', fontSize: 'var(--text-xs)', height: 'auto', display: 'flex', alignItems: 'center', gap: '4px' }}
+              onClick={() => navigate('/chat')}
+            >
+              <Plus size={14} />
+              แชทใหม่
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ padding: '4px 10px', fontSize: 'var(--text-xs)', height: 'auto', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}
+              onClick={handleDeleteCurrentChat}
+            >
+              <Trash2 size={14} />
+              ลบแชทนี้
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Messages Area */}
       <div className="chat-messages" id="chat-messages">
