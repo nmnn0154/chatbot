@@ -11,8 +11,13 @@ import {
   AlertTriangle,
   TrendingUp,
   FileDown,
-  Upload
+  Upload,
+  ChevronLeft,
+  ChevronRight,
+  Search
 } from 'lucide-react';
+
+const ITEMS_PER_PAGE = 10;
 
 export default function AdminFaq() {
   const [faqs, setFaqs] = useState([]);
@@ -20,6 +25,8 @@ export default function AdminFaq() {
   const [toast, setToast] = useState(null);
   const [modalMode, setModalMode] = useState(null); // 'add' | 'edit' | 'delete' | null
   const [targetFaq, setTargetFaq] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef(null);
 
   // Form State
@@ -160,26 +167,45 @@ export default function AdminFaq() {
         <p>สร้างคำถาม-คำตอบล่วงหน้าเพื่อลดภาระของระบบ AI และให้ข้อมูลผู้ใช้ได้ทันที</p>
       </div>
 
-      <div className="toolbar" style={{ justifyContent: 'flex-end', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
-        <button className="btn btn-secondary" onClick={handleDownloadTemplate} disabled={loading}>
-          <FileDown size={18} />
-          ไฟล์ต้นแบบ
-        </button>
-        <button className="btn btn-secondary" onClick={() => fileInputRef.current?.click()} disabled={loading}>
-          <Upload size={18} />
-          นำเข้า Excel
-        </button>
-        <input 
-          type="file" 
-          accept=".xlsx, .xls, .csv" 
-          ref={fileInputRef} 
-          style={{ display: 'none' }} 
-          onChange={handleFileUpload} 
-        />
-        <button className="btn btn-primary" onClick={openAddModal} disabled={loading}>
-          <Plus size={18} />
-          เพิ่ม FAQ
-        </button>
+      <div className="admin-faq-toolbar">
+        <div className="admin-faq-search">
+          <div className="faq-search-input-wrapper">
+            <Search size={16} className="faq-search-icon" style={{ left: '10px' }} />
+            <input
+              type="text"
+              className="input"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="ค้นหาคำถามหรือคำตอบ..."
+              style={{ paddingLeft: '34px', height: '38px' }}
+            />
+          </div>
+        </div>
+
+        <div className="admin-faq-actions">
+          <button className="btn btn-secondary" onClick={handleDownloadTemplate} disabled={loading}>
+            <FileDown size={18} />
+            <span>ไฟล์ต้นแบบ</span>
+          </button>
+          <button className="btn btn-secondary" onClick={() => fileInputRef.current?.click()} disabled={loading}>
+            <Upload size={18} />
+            <span>นำเข้า Excel</span>
+          </button>
+          <input 
+            type="file" 
+            accept=".xlsx, .xls, .csv" 
+            ref={fileInputRef} 
+            style={{ display: 'none' }} 
+            onChange={handleFileUpload} 
+          />
+          <button className="btn btn-primary" onClick={openAddModal} disabled={loading}>
+            <Plus size={18} />
+            <span>เพิ่ม FAQ</span>
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -195,69 +221,145 @@ export default function AdminFaq() {
             เพิ่มคำถามแรก
           </button>
         </div>
-      ) : (
-        <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr>
-                <th style={{ width: '40%' }}>คำถาม</th>
-                <th style={{ width: '40%' }}>คำตอบ</th>
-                <th>จำนวนครั้งที่ใช้</th>
-                <th style={{ width: '100px' }}>จัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {faqs.map((faq) => (
-                <tr key={faq.id}>
-                  <td>
-                    <div style={{ fontWeight: 500 }}>{faq.question}</div>
-                  </td>
-                  <td>
-                    <div style={{
-                      fontSize: 'var(--text-sm)',
-                      color: 'var(--color-text-secondary)',
-                      whiteSpace: 'pre-line',
-                      maxHeight: '4.5em',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical'
-                    }}>
-                      {faq.answer}
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-brand)' }}>
-                      <TrendingUp size={16} />
-                      <span style={{ fontWeight: 600 }}>{faq.usage_count}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+      ) : (() => {
+        const filteredFaqs = faqs.filter(
+          (faq) =>
+            faq.question?.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
+            faq.answer?.toLowerCase().includes(searchQuery.toLowerCase().trim())
+        );
+        const totalPages = Math.ceil(filteredFaqs.length / ITEMS_PER_PAGE) || 1;
+        const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+        const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+        const paginatedFaqs = filteredFaqs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+        if (filteredFaqs.length === 0) {
+          return (
+            <div className="empty-state">
+              <HelpCircle size={40} />
+              <p>ไม่พบรายการที่ตรงกับ "{searchQuery}"</p>
+              <button className="btn btn-secondary btn-sm" onClick={() => setSearchQuery('')}>
+                ล้างคำค้นหา
+              </button>
+            </div>
+          );
+        }
+
+        return (
+          <>
+            <div className="table-wrapper">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '40px' }}>#</th>
+                    <th style={{ width: '38%' }}>คำถาม</th>
+                    <th style={{ width: '38%' }}>คำตอบ</th>
+                    <th>จำนวนครั้งที่ใช้</th>
+                    <th style={{ width: '100px' }}>จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedFaqs.map((faq, index) => (
+                    <tr key={faq.id}>
+                      <td style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
+                        {startIndex + index + 1}
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{faq.question}</div>
+                      </td>
+                      <td>
+                        <div style={{
+                          fontSize: 'var(--text-sm)',
+                          color: 'var(--color-text-secondary)',
+                          whiteSpace: 'pre-line',
+                          maxHeight: '4.5em',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical'
+                        }}>
+                          {faq.answer}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-brand)' }}>
+                          <TrendingUp size={16} />
+                          <span style={{ fontWeight: 600 }}>{faq.usage_count}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+                          <button
+                            className="btn btn-ghost btn-icon btn-sm"
+                            onClick={() => openEditModal(faq)}
+                            title="แก้ไข"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-icon btn-sm"
+                            onClick={() => openDeleteModal(faq)}
+                            title="ลบ"
+                            style={{ color: 'var(--color-brand-rose)' }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="faq-pagination-container" style={{ marginTop: 'var(--space-md)', paddingTop: 'var(--space-md)' }}>
+                <div className="faq-pagination-info">
+                  แสดง <strong>{startIndex + 1} - {Math.min(startIndex + ITEMS_PER_PAGE, filteredFaqs.length)}</strong> จาก <strong>{filteredFaqs.length}</strong> รายการ (หน้า {safeCurrentPage} จาก {totalPages})
+                </div>
+
+                <div className="faq-pagination-controls">
+                  <button
+                    type="button"
+                    className="faq-pagination-btn"
+                    onClick={() => setCurrentPage(safeCurrentPage - 1)}
+                    disabled={safeCurrentPage === 1}
+                    title="ก่อนหน้า"
+                  >
+                    <ChevronLeft size={16} />
+                    <span className="faq-pagination-nav-text">ก่อนหน้า</span>
+                  </button>
+
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                       <button
-                        className="btn btn-ghost btn-icon btn-sm"
-                        onClick={() => openEditModal(faq)}
-                        title="แก้ไข"
+                        type="button"
+                        key={p}
+                        onClick={() => setCurrentPage(p)}
+                        className={`faq-pagination-btn ${safeCurrentPage === p ? 'active' : ''}`}
                       >
-                        <Edit2 size={16} />
+                        {p}
                       </button>
-                      <button
-                        className="btn btn-ghost btn-icon btn-sm"
-                        onClick={() => openDeleteModal(faq)}
-                        title="ลบ"
-                        style={{ color: 'var(--color-brand-rose)' }}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="faq-pagination-btn"
+                    onClick={() => setCurrentPage(safeCurrentPage + 1)}
+                    disabled={safeCurrentPage === totalPages}
+                    title="ถัดไป"
+                  >
+                    <span className="faq-pagination-nav-text">ถัดไป</span>
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* Add/Edit Modal */}
       {(modalMode === 'add' || modalMode === 'edit') && (
