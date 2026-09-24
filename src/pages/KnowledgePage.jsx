@@ -346,20 +346,7 @@ export default function KnowledgePage() {
           </p>
 
           {/* Quick Highlight Badges */}
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: 'var(--space-md)' }}>
-            <span style={{ background: 'rgba(255,255,255,0.15)', padding: '4px 10px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              ✨ ดอกเบี้ยต่ำ 1% ต่อปี
-            </span>
-            <span style={{ background: 'rgba(255,255,255,0.15)', padding: '4px 10px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              🛡️ ยกเลิกผู้ค้ำประกัน
-            </span>
-            <span style={{ background: 'rgba(255,255,255,0.15)', padding: '4px 10px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              ⏳ ปลอดหนี้ 2 ปีแรก
-            </span>
-            <span style={{ background: 'rgba(255,255,255,0.15)', padding: '4px 10px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              📱 ผ่อนปรนด้วยแอป Connect
-            </span>
-          </div>
+          
         </div>
       </div>
 

@@ -14,7 +14,25 @@ import {
   Megaphone,
   CalendarDays,
   Layers,
+  ShieldCheck,
 } from 'lucide-react';
+import AdminSubNav from './admin/AdminSubNav';
+import BottomNav from './BottomNav';
+
+function getPageTitle(pathname) {
+  if (pathname === '/chat') return 'กยศ. Chatbot';
+  if (pathname === '/knowledge') return 'องค์ความรู้ กยศ.';
+  if (pathname === '/faqs') return 'คำถามที่พบบ่อย (FAQ)';
+  if (pathname === '/news') return 'ข่าวสารและประกาศ';
+  if (pathname === '/calendar') return 'ปฏิทิน กยศ.';
+  if (pathname === '/admin') return 'แดชบอร์ดแอดมิน';
+  if (pathname === '/admin/knowledge') return 'จัดการองค์ความรู้';
+  if (pathname === '/admin/knowledge-base') return 'ฐานข้อมูล AI';
+  if (pathname === '/admin/faqs') return 'จัดการ FAQ';
+  if (pathname === '/admin/news') return 'จัดการข่าวสาร';
+  if (pathname === '/admin/calendar') return 'จัดการปฏิทิน';
+  return 'กยศ. Chatbot';
+}
 
 export default function Layout({ children }) {
   const { profile, isAdmin, signOut, loading } = useAuth();
@@ -235,28 +253,54 @@ export default function Layout({ children }) {
 
       {/* Mobile Topbar */}
       <div className="topbar">
-        <button
-          className="btn btn-ghost btn-icon"
-          onClick={() => setSidebarOpen(true)}
-          aria-label="เปิดเมนู"
-        >
-          <Menu size={22} />
-        </button>
-        <div className="topbar-brand">
-          <div className="topbar-logo">กยศ.</div>
-          <span className="topbar-title">กยศ. Chatbot</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+          <button
+            className="btn btn-ghost btn-icon"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="เปิดเมนู"
+          >
+            <Menu size={22} />
+          </button>
+          <div className="topbar-brand" style={{ minWidth: 0 }}>
+            <div className="topbar-logo" style={{ flexShrink: 0 }}>กยศ.</div>
+            <span className="topbar-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {getPageTitle(location.pathname)}
+            </span>
+          </div>
         </div>
-        <button
-          className="btn btn-ghost btn-icon"
-          onClick={handleSignOut}
-          aria-label="ออกจากระบบ"
-        >
-          <LogOut size={20} />
-        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          {isAdmin && (
+            <span
+              style={{
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: '12px',
+                background: 'var(--color-primary-soft)',
+                color: 'var(--color-primary)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+              }}
+            >
+              <ShieldCheck size={11} /> แอดมิน
+            </span>
+          )}
+          <button
+            className="btn btn-ghost btn-icon"
+            onClick={handleSignOut}
+            aria-label="ออกจากระบบ"
+            title="ออกจากระบบ"
+          >
+            <LogOut size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
       <main className="main-content">
+        {isAdmin && location.pathname.startsWith('/admin') && <AdminSubNav />}
         {children}
         {location.pathname !== '/chat' && (
           <footer className="app-footer">
@@ -272,6 +316,9 @@ export default function Layout({ children }) {
           </footer>
         )}
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNav isAdmin={isAdmin} />
     </div>
   );
 }
