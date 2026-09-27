@@ -20,6 +20,8 @@ import {
   BarChart3,
   Layers,
   AlertTriangle,
+  FileText,
+  CalendarDays,
 } from 'lucide-react';
 
 /* ─── Modern SVG Bar Chart ──────────────────────────────────── */
@@ -1041,6 +1043,62 @@ export default function AdminDashboard() {
                 </h4>
                 <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', margin: 0 }}>
                   โพสต์ประกาศทุน กยศ.
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              to="/admin/calendar"
+              className="card card-glow"
+              style={{
+                padding: 'var(--space-md)',
+                textDecoration: 'none',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-bg-primary)',
+                transition: 'all 0.2s',
+              }}
+            >
+              <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: '#f5f3ff', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CalendarDays size={18} />
+              </div>
+              <div>
+                <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+                  จัดการปฏิทิน
+                </h4>
+                <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', margin: 0 }}>
+                  กำหนดการยื่นกู้และส่งเอกสาร
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              to="/admin/documents"
+              className="card card-glow"
+              style={{
+                padding: 'var(--space-md)',
+                textDecoration: 'none',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-bg-primary)',
+                transition: 'all 0.2s',
+              }}
+            >
+              <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FileText size={18} />
+              </div>
+              <div>
+                <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+                  จัดการตัวอย่างเอกสาร
+                </h4>
+                <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', margin: 0 }}>
+                  แบบฟอร์มและไฟล์ให้ดาวน์โหลด
                 </p>
               </div>
             </Link>

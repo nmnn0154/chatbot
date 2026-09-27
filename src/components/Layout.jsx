@@ -19,6 +19,7 @@ import {
   GraduationCap,
   Phone,
   Globe,
+  FileText,
 } from 'lucide-react';
 
 function getPageTitle(pathname) {
@@ -27,12 +28,14 @@ function getPageTitle(pathname) {
   if (pathname === '/faqs') return 'คำถามที่พบบ่อย (FAQ)';
   if (pathname === '/news') return 'ข่าวสารและประกาศ';
   if (pathname === '/calendar') return 'ปฏิทิน กยศ.';
+  if (pathname === '/documents') return 'ตัวอย่างเอกสาร & แบบฟอร์ม';
   if (pathname === '/admin') return 'แดชบอร์ดแอดมิน';
   if (pathname === '/admin/knowledge') return 'จัดการองค์ความรู้';
   if (pathname === '/admin/knowledge-base') return 'ฐานข้อมูล AI';
   if (pathname === '/admin/faqs') return 'จัดการ FAQ';
   if (pathname === '/admin/news') return 'จัดการข่าวสาร';
   if (pathname === '/admin/calendar') return 'จัดการปฏิทิน';
+  if (pathname === '/admin/documents') return 'จัดการตัวอย่างเอกสาร';
   return 'กยศ. Chatbot';
 }
 
@@ -166,6 +169,14 @@ export default function Layout({ children }) {
             <CalendarDays size={20} />
             ปฏิทินการดำเนินงาน
           </NavLink>
+          <NavLink
+            to="/documents"
+            className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+            onClick={closeSidebar}
+          >
+            <FileText size={20} />
+            ดาวน์โหลดเอกสาร  
+          </NavLink>
 
           {isAdmin && (
             <>
@@ -221,6 +232,14 @@ export default function Layout({ children }) {
               >
                 <CalendarDays size={20} />
                 จัดการปฏิทิน
+              </NavLink>
+              <NavLink
+                to="/admin/documents"
+                className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
+                onClick={closeSidebar}
+              >
+                <FileText size={20} />
+                จัดการตัวอย่างเอกสาร
               </NavLink>
             </>
           )}

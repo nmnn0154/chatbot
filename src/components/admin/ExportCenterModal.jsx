@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { downloadCsv } from '../../lib/csv';
+import { downloadCsv, downloadExcel } from '../../lib/csv';
 import {
   X,
   FileDown,
@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Check,
   Sparkles,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 const REPORT_TYPES = [
@@ -97,6 +98,7 @@ export default function ExportCenterModal({ isOpen, onClose, initialReport = 'de
   });
   const [customEnd, setCustomEnd] = useState(() => new Date().toISOString().slice(0, 10));
   const [ratingFilter, setRatingFilter] = useState('all'); // 'all' | 'rated' | 'low' | 'high'
+  const [exportFormat, setExportFormat] = useState('excel'); // 'excel' | 'csv'
   const [exporting, setExporting] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null);
 
@@ -168,6 +170,14 @@ export default function ExportCenterModal({ isOpen, onClose, initialReport = 'de
     setExporting(true);
     setStatusMessage(null);
 
+    const triggerDownload = (baseFileName, rows) => {
+      if (exportFormat === 'excel') {
+        downloadExcel(baseFileName, rows, currentReportObj?.title || 'Report');
+      } else {
+        downloadCsv(baseFileName, rows);
+      }
+    };
+
     try {
       const { start, end } = getDateBoundaries();
       const dateTag = new Date().toISOString().slice(0, 10);
@@ -219,7 +229,7 @@ export default function ExportCenterModal({ isOpen, onClose, initialReport = 'de
           'ระดับความพึงพอใจ': getRatingLabel(c.rating),
         }));
 
-        downloadCsv(`chat_histories_detailed_${dateTag}`, rows);
+        triggerDownload(`chat_histories_detailed_${dateTag}`, rows);
         setStatusMessage({ type: 'success', text: `ส่งออกสำเร็จเรียบร้อย (${rows.length.toLocaleString()} รายการ)` });
       }
 
@@ -290,7 +300,7 @@ export default function ExportCenterModal({ isOpen, onClose, initialReport = 'de
           };
         });
 
-        downloadCsv(`daily_analytics_kpi_${dateTag}`, rows);
+        triggerDownload(`daily_analytics_kpi_${dateTag}`, rows);
         setStatusMessage({ type: 'success', text: `ส่งออกรายงานสถิติรายวันสำเร็จ (${rows.length.toLocaleString()} วัน)` });
       }
 
@@ -351,7 +361,7 @@ export default function ExportCenterModal({ isOpen, onClose, initialReport = 'de
           'ตัวอย่างคำตอบล่าสุดของ AI': item.latestAnswer,
         }));
 
-        downloadCsv(`top_frequent_questions_${dateTag}`, rows);
+        triggerDownload(`top_frequent_questions_${dateTag}`, rows);
         setStatusMessage({ type: 'success', text: `ส่งออกรายงานคำถามยอดนิยมสำเร็จ (${rows.length.toLocaleString()} คำถาม)` });
       }
 
@@ -387,7 +397,7 @@ export default function ExportCenterModal({ isOpen, onClose, initialReport = 'de
           'ข้อเสนอแนะการปรับปรุง': 'แนะนำให้ตรวจสอบคำตอบและเพิ่มข้อมูลลงในคู่มือ RAG หรือคลัง FAQ',
         }));
 
-        downloadCsv(`low_rating_issues_audit_${dateTag}`, rows);
+        triggerDownload(`low_rating_issues_audit_${dateTag}`, rows);
         setStatusMessage({ type: 'success', text: `ส่งออกรายการที่ต้องปรับปรุงสำเร็จ (${rows.length.toLocaleString()} รายการ)` });
       }
 
@@ -440,7 +450,7 @@ export default function ExportCenterModal({ isOpen, onClose, initialReport = 'de
           return;
         }
 
-        downloadCsv(`knowledge_and_faqs_backup_${dateTag}`, rows);
+        triggerDownload(`knowledge_and_faqs_backup_${dateTag}`, rows);
         setStatusMessage({ type: 'success', text: `ส่งออกข้อมูลสำรองฐานความรู้และ FAQ สำเร็จ (${rows.length.toLocaleString()} รายการ)` });
       }
     } catch (err) {
@@ -520,7 +530,7 @@ export default function ExportCenterModal({ isOpen, onClose, initialReport = 'de
                 ศูนย์ส่งออกรายงานระบบ (Export Center)
               </h2>
               <p style={{ fontSize: 'clamp(0.7rem, 2.5vw, 0.75rem)', color: 'var(--color-text-secondary)', margin: '2px 0 0', lineHeight: 1.4 }}>
-                ส่งออกข้อมูลเป็น CSV พร้อม UTF-8 BOM (เปิดใน Excel ได้ทันที)
+                ส่งออกข้อมูลเป็น Excel (.xlsx คอลัมน์พอดีคำอัตโนมัติ) หรือ CSV พร้อม UTF-8 BOM
               </p>
             </div>
           </div>
@@ -809,6 +819,73 @@ export default function ExportCenterModal({ isOpen, onClose, initialReport = 'de
             </div>
           )}
 
+          {/* Section: File Format Selection */}
+          <div>
+            <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8 }}>
+              {selectedReport === 'detailed_chats' ? '4.' : '3.'} เลือกรูปแบบไฟล์ที่ต้องการส่งออก (File Format)
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+              {/* Option 1: Excel (.xlsx) with Auto-fit columns */}
+              <div
+                onClick={() => setExportFormat('excel')}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  border: exportFormat === 'excel' ? '2px solid #16a34a' : '1px solid var(--color-border)',
+                  background: exportFormat === 'excel' ? '#f0fdf4' : 'var(--color-bg-primary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  boxShadow: exportFormat === 'excel' ? '0 2px 8px rgba(22, 163, 74, 0.15)' : 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: 'var(--text-sm)', color: '#15803d' }}>
+                    <FileSpreadsheet size={18} />
+                    <span>Excel (.xlsx)</span>
+                  </div>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px', borderRadius: 'var(--radius-full)', background: '#dcfce7', color: '#166534' }}>
+                    ⭐ แนะนำ: ปรับคอลัมน์พอดีคำ
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
+                  คำนวณและปรับขนาดความกว้างคอลัมน์ให้พอดีกับข้อความภาษาไทยอัตโนมัติ (Auto-fit Column Width) เปิดอ่านได้ทันที
+                </p>
+              </div>
+
+              {/* Option 2: CSV (.csv) */}
+              <div
+                onClick={() => setExportFormat('csv')}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  border: exportFormat === 'csv' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                  background: exportFormat === 'csv' ? 'var(--color-primary-soft)' : 'var(--color-bg-primary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)' }}>
+                    <FileDown size={18} />
+                    <span>CSV (.csv)</span>
+                  </div>
+                  <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)' }}>
+                    Plain Text
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                  ไฟล์ข้อความคั่นด้วยจุลภาค UTF-8 BOM มาตรฐาน (ความกว้างคอลัมน์ขึ้นอยู่กับค่าเริ่มต้นของ Excel)
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Preview Box of Columns to be exported */}
           <div
             style={{
@@ -821,7 +898,7 @@ export default function ExportCenterModal({ isOpen, onClose, initialReport = 'de
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 8 }}>
               <Sparkles size={16} color="var(--color-primary)" />
               <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                คอลัมน์ที่จะได้รับในไฟล์ CSV:
+                คอลัมน์ที่จะได้รับในไฟล์ {exportFormat === 'excel' ? 'Excel (.xlsx)' : 'CSV (.csv)'}:
               </span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -841,9 +918,16 @@ export default function ExportCenterModal({ isOpen, onClose, initialReport = 'de
                 </span>
               ))}
             </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: 8 }}>
-              💡 ตัวช่วยเข้ารหัสภาษาไทย UTF-8 BOM จะถูกแนบไปกับไฟล์อัตโนมัติ ทำให้สระภาษาไทยไม่ตกหล่นเมื่อเปิดด้วย Excel
-            </div>
+            {exportFormat === 'excel' ? (
+              <div style={{ fontSize: '0.72rem', color: '#15803d', marginTop: 8, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                <CheckCircle2 size={14} />
+                ระบบจะวัดความยาวข้อความภาษาไทยและปรับขนาดคอลัมน์ให้พอดีโดยอัตโนมัติ (Auto-fit Columns) ไม่ถูกบีบอัด
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: 8 }}>
+                💡 ตัวช่วยเข้ารหัสภาษาไทย UTF-8 BOM จะถูกแนบไปกับไฟล์อัตโนมัติ ทำให้สระภาษาไทยไม่ตกหล่นเมื่อเปิดด้วย Excel
+              </div>
+            )}
           </div>
         </div>
 
@@ -886,10 +970,15 @@ export default function ExportCenterModal({ isOpen, onClose, initialReport = 'de
               fontWeight: 700,
               minHeight: 42,
               flex: '2 1 200px',
+              background: exportFormat === 'excel' ? 'var(--color-primary)' : undefined,
             }}
           >
-            <FileDown size={16} />
-            {exporting ? 'กำลังรวบรวมข้อมูล...' : 'ดาวน์โหลดรายงาน CSV'}
+            {exportFormat === 'excel' ? <FileSpreadsheet size={16} /> : <FileDown size={16} />}
+            {exporting
+              ? 'กำลังรวบรวมข้อมูล...'
+              : exportFormat === 'excel'
+              ? 'ดาวน์โหลดรายงาน Excel (.xlsx) [คอลัมน์พอดีคำ]'
+              : 'ดาวน์โหลดรายงาน CSV'}
           </button>
         </div>
       </div>

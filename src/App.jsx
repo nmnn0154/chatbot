@@ -13,6 +13,7 @@ const KnowledgePage = lazy(() => import('./pages/KnowledgePage'));
 const FAQPage = lazy(() => import('./pages/FAQPage'));
 const NewsPage = lazy(() => import('./pages/NewsPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
+const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminKnowledge = lazy(() => import('./pages/admin/AdminKnowledge'));
@@ -20,6 +21,7 @@ const KnowledgeBase = lazy(() => import('./pages/admin/KnowledgeBase'));
 const AdminFaq = lazy(() => import('./pages/admin/AdminFaq'));
 const AdminNews = lazy(() => import('./pages/admin/AdminNews'));
 const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
+const AdminDocuments = lazy(() => import('./pages/admin/AdminDocuments'));
 
 function PageLoader() {
   return (
@@ -92,6 +94,17 @@ function App() {
               }
             />
 
+            <Route
+              path="/documents"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <DocumentsPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
             {/* Protected - Admin */}
             <Route
               path="/admin"
@@ -151,6 +164,17 @@ function App() {
                 <ProtectedRoute requireAdmin>
                   <Layout>
                     <AdminCalendar />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/documents"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <Layout>
+                    <AdminDocuments />
                   </Layout>
                 </ProtectedRoute>
               }
