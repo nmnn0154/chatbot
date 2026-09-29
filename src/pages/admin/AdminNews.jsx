@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getAllNews, createNews, updateNews, deleteNews } from '../../lib/newsApi';
+import { confirmDelete } from '../../lib/swalHelper';
 import {
   Plus,
   Edit2,
@@ -319,7 +320,14 @@ export default function AdminNews() {
   };
 
   const handleDelete = async (news) => {
-    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบข่าวสาร: "${news.title}"?\nข้อมูลที่ลบจะไม่สามารถกู้คืนได้`)) {
+    const isConfirmed = await confirmDelete({
+      title: `ลบข่าวสารนี้?`,
+      text: `คุณต้องการลบ "${news.title}" ใช่หรือไม่? ข้อมูลที่ลบจะไม่สามารถกู้คืนได้`,
+      confirmText: 'ใช่, ลบเลย',
+      cancelText: 'ยกเลิก',
+    });
+
+    if (isConfirmed) {
       const success = await deleteNews(news.id, news.image_url || null);
       if (success) {
         showToast('ลบข่าวสารเรียบร้อยแล้ว', 'success');

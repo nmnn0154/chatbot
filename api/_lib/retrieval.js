@@ -9,7 +9,7 @@ import { embedTexts } from './gemini.js';
  * scoped to the caller's Supabase JWT so Row Level Security still applies.
  */
 
-const MATCH_THRESHOLD = 0.2;
+const MATCH_THRESHOLD = 0.15;
 const MATCH_COUNT = 15;
 
 // Read lazily — in dev, dotenv.config() runs after this module is imported.
@@ -30,13 +30,13 @@ function getUserClient(accessToken) {
 }
 
 /**
- * Anchor very short / generic queries to the กยศ. domain so vector similarity
- * has something to grab onto (e.g. a bare "คุณสมบัติ").
+ * Anchor queries to the กยศ. domain so vector similarity and embeddings
+ * consistently match relevant policy chunks (fixes query drift on queries like "เอกสารที่ต้องใช้เตรียมกู้รายใหม่").
  */
 function enhanceQuery(query) {
   const q = query.trim();
-  if (q.length < 30 && !q.includes('กยศ')) {
-    return `${q} กยศ. กองทุนเงินให้กู้ยืมเพื่อการศึกษา`;
+  if (!q.includes('กยศ') && !q.includes('กองทุน')) {
+    return `${q} กยศ. กองทุนเงินให้กู้ยืมเพื่อการศึกษา มทร.ศรีวิชัย`;
   }
   return q;
 }
@@ -48,7 +48,8 @@ function enhanceQuery(query) {
 async function fetchCalendarContext(supabase) {
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const { data, error } = await supabase
+    // 1. Try fetching upcoming published events first
+    let { data, error } = await supabase
       .from('calendar_events')
       .select('title, description, category, academic_year, term, borrower_type, start_date, end_date')
       .eq('is_published', true)
@@ -56,7 +57,20 @@ async function fetchCalendarContext(supabase) {
       .order('start_date', { ascending: true })
       .limit(20);
 
-    if (error || !data || data.length === 0) return null;
+    // 2. If no upcoming events, fallback to the latest published events of the current/recent academic year
+    if (!data || data.length === 0) {
+      const fallback = await supabase
+        .from('calendar_events')
+        .select('title, description, category, academic_year, term, borrower_type, start_date, end_date')
+        .eq('is_published', true)
+        .order('start_date', { ascending: false })
+        .limit(10);
+      if (fallback.data && fallback.data.length > 0) {
+        data = fallback.data.reverse();
+      }
+    }
+
+    if (!data || data.length === 0) return null;
 
     const fmt = (d) => (d ? new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
     const lines = data.map((e) => {
@@ -72,15 +86,36 @@ async function fetchCalendarContext(supabase) {
   }
 }
 
-/** Cheap keyword overlap score between a query and a piece of text. */
+/** 
+ * Improved keyword overlap score for Thai queries and text.
+ * Generates sliding substrings (n-grams) when whitespace is absent.
+ */
 function keywordScore(query, text) {
-  if (!text) return 0;
+  if (!text || !query) return 0;
   const t = text.toLowerCase();
   const q = query.toLowerCase().trim();
   let score = 0;
-  if (q.length >= 4 && t.includes(q)) score += 5;
+
+  // Exact substring match
+  if (q.length >= 3 && t.includes(q)) score += 8;
+
+  // Split tokens by space/punctuation
   const tokens = q.split(/[\s,.?!/()"'“”）（]+/).filter((w) => w.length >= 3);
-  for (const w of tokens) if (t.includes(w)) score += 1;
+  for (const w of tokens) {
+    if (t.includes(w)) score += 3;
+  }
+
+  // Also check 3-char to 6-char sliding window for continuous Thai text
+  const cleanQ = q.replace(/[\s,.?!/()"'“”）（]+/g, '');
+  if (cleanQ.length >= 4) {
+    for (let len = 4; len <= Math.min(8, cleanQ.length); len++) {
+      for (let i = 0; i <= cleanQ.length - len; i += 2) {
+        const sub = cleanQ.substring(i, i + len);
+        if (t.includes(sub)) score += 1;
+      }
+    }
+  }
+
   return score;
 }
 

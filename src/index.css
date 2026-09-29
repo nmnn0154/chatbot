@@ -1891,3 +1891,44 @@ select.input {
   color: #ffffff;
   transform: translateY(-1px);
 }
+
+/* SweetAlert2 Customized Styling */
+.swal2-app-popup {
+  font-family: var(--font-thai), sans-serif !important;
+  border-radius: 16px !important;
+  padding: 1.75rem !important;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.2) !important;
+}
+
+.swal2-app-title {
+  font-family: var(--font-thai), sans-serif !important;
+  font-size: 1.35rem !important;
+  font-weight: 600 !important;
+  color: var(--color-text-primary, #1e293b) !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.swal2-app-text {
+  font-family: var(--font-thai), sans-serif !important;
+  font-size: 0.95rem !important;
+  color: var(--color-text-secondary, #475569) !important;
+  line-height: 1.6 !important;
+}
+
+.swal2-app-btn-confirm,
+.swal2-app-btn-cancel {
+  font-family: var(--font-thai), sans-serif !important;
+  font-size: 0.95rem !important;
+  font-weight: 500 !important;
+  border-radius: 10px !important;
+  padding: 0.6rem 1.25rem !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease !important;
+}
+
+.swal2-app-btn-confirm:hover,
+.swal2-app-btn-cancel:hover {
+  transform: translateY(-1px) !important;
+  opacity: 0.95 !important;
+}
+

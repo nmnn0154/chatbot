@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getChatHistory, deleteChatFromLocal, clearAllChatHistory } from '../lib/chatApi';
+import { confirmDelete, showSuccess } from '../lib/swalHelper';
 import {
   MessageSquare,
   LayoutDashboard,
@@ -64,26 +65,43 @@ export default function Layout({ children }) {
     navigate('/login');
   };
 
-  const handleDeleteChat = (e, chatId) => {
+  const handleDeleteChat = async (e, chatId) => {
     e.preventDefault();
     e.stopPropagation();
-    deleteChatFromLocal(chatId, profile?.id);
-    const updated = getChatHistory(profile?.id);
-    setRecentChats(updated);
-    window.dispatchEvent(new Event('chatHistoryUpdated'));
+    const isConfirmed = await confirmDelete({
+      title: 'ลบประวัติการสนทนานี้?',
+      text: 'ข้อความนี้จะถูกลบออกจากรายการของคุณ',
+      confirmText: 'ลบเลย',
+      cancelText: 'ยกเลิก',
+    });
 
-    if (currentChatId === chatId) {
-      navigate('/chat');
+    if (isConfirmed) {
+      deleteChatFromLocal(chatId, profile?.id);
+      const updated = getChatHistory(profile?.id);
+      setRecentChats(updated);
+      window.dispatchEvent(new Event('chatHistoryUpdated'));
+
+      if (currentChatId === chatId) {
+        navigate('/chat');
+      }
     }
   };
 
-  const handleClearAllHistory = (e) => {
+  const handleClearAllHistory = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (window.confirm('คุณต้องการล้างประวัติการสนทนาทั้งหมดใช่หรือไม่?')) {
+    const isConfirmed = await confirmDelete({
+      title: 'ล้างประวัติการสนทนาทั้งหมด?',
+      text: 'ประวัติการแชททั้งหมดของคุณจะถูกลบถาวร ไม่สามารถกู้คืนได้',
+      confirmText: 'ใช่, ล้างทั้งหมด',
+      cancelText: 'ยกเลิก',
+    });
+
+    if (isConfirmed) {
       clearAllChatHistory(profile?.id);
       setRecentChats([]);
       window.dispatchEvent(new Event('chatHistoryUpdated'));
+      showSuccess('ล้างประวัติการสนทนาเรียบร้อยแล้ว');
       if (currentChatId) {
         navigate('/chat');
       }
