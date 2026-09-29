@@ -17,6 +17,7 @@ import {
   DOCUMENT_CATEGORIES,
   downloadDocumentFile,
 } from '../lib/documentApi';
+import { showSuccess } from '../lib/swalHelper';
 import DocumentSampleViewer from '../components/DocumentSampleViewer';
 
 export default function DocumentsPage() {
@@ -60,6 +61,7 @@ export default function DocumentsPage() {
   const handleDownload = (e, doc) => {
     e.stopPropagation();
     downloadDocumentFile(doc);
+    showSuccess('เริ่มดาวน์โหลดไฟล์แล้ว', doc.title || 'เอกสาร กยศ.', 1500);
     // Optimistically update local download count
     setDocuments((prev) =>
       prev.map((d) =>

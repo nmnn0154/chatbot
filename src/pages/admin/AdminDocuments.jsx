@@ -25,6 +25,7 @@ import {
   DOCUMENT_CATEGORIES,
   downloadDocumentFile,
 } from '../../lib/documentApi';
+import { confirmDelete, showSuccess, showError } from '../../lib/swalHelper';
 import DocumentSampleViewer from '../../components/DocumentSampleViewer';
 
 const ITEMS_PER_PAGE = 8;
@@ -168,10 +169,31 @@ export default function AdminDocuments() {
     setModalMode('edit');
   }
 
-  // Open Delete Modal
-  function handleOpenDelete(doc) {
-    setTargetDoc(doc);
-    setModalMode('delete');
+  // Open Delete Modal with SweetAlert2
+  async function handleOpenDelete(doc) {
+    const isConfirmed = await confirmDelete({
+      title: 'ลบเอกสารและแบบฟอร์มนี้?',
+      text: `คุณต้องการลบ "${doc.title}" ออกจากระบบใช่หรือไม่? ข้อมูลและไฟล์ที่เกี่ยวข้องจะถูกลบถาวร`,
+      confirmText: 'ใช่, ลบเลย',
+      cancelText: 'ยกเลิก',
+    });
+
+    if (isConfirmed) {
+      setSubmitting(true);
+      try {
+        const allImgs = Array.isArray(doc.preview_images) && doc.preview_images.length > 0
+          ? doc.preview_images
+          : (doc.preview_image_url ? [doc.preview_image_url] : null);
+        await deleteDocument(doc.id, doc.file_url, allImgs);
+        showSuccess('ลบเอกสารเรียบร้อยแล้ว');
+        await loadDocuments();
+      } catch (err) {
+        console.error('Delete document error:', err);
+        showError('เกิดข้อผิดพลาดในการลบเอกสาร');
+      } finally {
+        setSubmitting(false);
+      }
+    }
   }
 
   // File change handlers

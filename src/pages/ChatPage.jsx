@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { sendChatMessage, getChatById, rateChatResponse, deleteChatFromLocal } from '../lib/chatApi';
+import { confirmDelete, showSuccess } from '../lib/swalHelper';
 import { Send, AlertTriangle, Bot, Sparkles, Star, Trash2, Plus } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
@@ -12,6 +13,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [ratings, setRatings] = useState({}); // Track local ratings by historyId
+  const [hoveredRatings, setHoveredRatings] = useState({}); // Track hover state by historyId
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const location = useLocation();
@@ -142,25 +144,25 @@ export default function ChatPage() {
 
   const userInitial = profile?.full_name?.charAt(0) || 'U';
 
-  const handleDeleteCurrentChat = () => {
+  const handleDeleteCurrentChat = async () => {
     if (!chatId) return;
-    if (window.confirm('คุณต้องการลบประวัติการสนทนานี้ใช่หรือไม่?')) {
+    const isConfirmed = await confirmDelete({
+      title: 'ลบประวัติการสนทนานี้?',
+      text: 'ข้อความในประวัตินี้จะถูกลบถาวร ไม่สามารถกู้คืนได้',
+      confirmText: 'ใช่, ลบเลย',
+      cancelText: 'ยกเลิก',
+    });
+
+    if (isConfirmed) {
       deleteChatFromLocal(chatId, user?.id);
       window.dispatchEvent(new Event('chatHistoryUpdated'));
+      showSuccess('ลบแชทเรียบร้อยแล้ว', '', 1200);
       navigate('/chat');
     }
   };
 
   return (
     <div className="chat-container" id="chat-page">
-      {/* Disclaimer Banner */}
-      <div className="chat-disclaimer">
-        <AlertTriangle size={16} />
-        <span>
-          ระบบนี้ให้คำแนะนำเบื้องต้นเท่านั้น ไม่สามารถเข้าถึงข้อมูลส่วนบุคคลหรือยอดหนี้ กยศ. ได้
-        </span>
-      </div>
-
       {/* Active History Notice Banner */}
       {chatId && (
         <div style={{
@@ -209,6 +211,9 @@ export default function ChatPage() {
               ผมคือแชทบอท กยศ. พร้อมช่วยตอบคำถามเกี่ยวกับกองทุนเงินให้กู้ยืมเพื่อการศึกษา
               สำหรับนักศึกษา มทร.ศรีวิชัย
             </p>
+            <div style={{ marginTop: '12px', padding: '6px 12px', background: 'var(--color-bg-hover)', borderRadius: '8px', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+              ⚠️ ระบบนี้ให้คำแนะนำเบื้องต้นเท่านั้น ไม่สามารถเข้าถึงข้อมูลส่วนบุคคลหรือยอดหนี้ กยศ. ได้
+            </div>
           </div>
         )}
 
@@ -240,65 +245,90 @@ export default function ChatPage() {
               </div>
               <div className="message-time" style={{ marginTop: '4px' }}>{formatTime(msg.time)}</div>
               
-              {msg.type === 'bot' && msg.historyId && (
-                <div 
-                  className="rating-container" 
-                  style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    marginTop: '16px',
-                    padding: '12px',
-                    background: 'var(--color-bg-hover)',
-                    borderRadius: '12px',
-                    border: '1px solid var(--color-border)',
-                    width: 'fit-content',
-                    margin: '16px auto 0' // Center it below the bubble
-                  }}
-                >
-                  <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
-                    คุณพึงพอใจกับคำตอบนี้หรือไม่?
-                  </span>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <button
-                        key={star}
-                        onClick={() => handleRate(msg.historyId, star)}
-                        disabled={ratings[msg.historyId] !== undefined}
-                        aria-label={`ให้คะแนน ${star} ดาว`}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: ratings[msg.historyId] !== undefined ? 'default' : 'pointer',
-                          padding: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          color: (ratings[msg.historyId] >= star) ? 'var(--color-warning)' : 'var(--color-text-muted)',
-                          transition: 'all 0.2s ease',
-                          opacity: (ratings[msg.historyId] !== undefined && ratings[msg.historyId] < star) ? 0.3 : 1,
-                          transform: (ratings[msg.historyId] >= star) ? 'scale(1.1)' : 'scale(1)'
-                        }}
-                        title={`ให้ ${star} ดาว`}
-                        onMouseEnter={(e) => {
-                          if (ratings[msg.historyId] === undefined) {
-                            e.currentTarget.style.transform = 'scale(1.2)';
-                            e.currentTarget.style.color = 'var(--color-warning)';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (ratings[msg.historyId] === undefined) {
-                            e.currentTarget.style.transform = 'scale(1)';
-                            e.currentTarget.style.color = 'var(--color-text-muted)';
-                          }
-                        }}
-                      >
-                        <Star size={24} fill={(ratings[msg.historyId] >= star) ? 'currentColor' : 'none'} />
-                      </button>
-                    ))}
+              {msg.type === 'bot' && msg.historyId && (() => {
+                const currentRating = ratings[msg.historyId];
+                const hoverRating = hoveredRatings[msg.historyId] || 0;
+                const activeScore = hoverRating || currentRating || 0;
+                const starDescriptions = {
+                  1: '1 ดาว (ต้องปรับปรุง)',
+                  2: '2 ดาว (พอใช้)',
+                  3: '3 ดาว (ปานกลาง)',
+                  4: '4 ดาว (ดี)',
+                  5: '5 ดาว (ดีเยี่ยม)'
+                };
+
+                return (
+                  <div 
+                    className="rating-container" 
+                    style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      marginTop: '16px',
+                      padding: '12px 18px',
+                      background: 'var(--color-bg-hover)',
+                      borderRadius: '12px',
+                      border: '1px solid var(--color-border)',
+                      width: 'fit-content',
+                      margin: '16px auto 0' // Center it below the bubble
+                    }}
+                  >
+                    <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--color-text)', marginBottom: '8px' }}>
+                      {currentRating ? 'ขอบคุณสำหรับการประเมิน' : 'คุณพึงพอใจกับคำตอบนี้หรือไม่?'}
+                    </span>
+                    <div 
+                      style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
+                      onMouseLeave={() => {
+                        if (currentRating === undefined) {
+                          setHoveredRatings(prev => ({ ...prev, [msg.historyId]: 0 }));
+                        }
+                      }}
+                    >
+                      {[1, 2, 3, 4, 5].map(star => {
+                        const isFilled = activeScore >= star;
+                        return (
+                          <button
+                            key={star}
+                            onClick={() => handleRate(msg.historyId, star)}
+                            disabled={currentRating !== undefined}
+                            aria-label={`ให้คะแนน ${star} ดาว`}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: currentRating !== undefined ? 'default' : 'pointer',
+                              padding: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              color: isFilled ? '#f59e0b' : 'var(--color-text-muted)',
+                              transition: 'transform 0.15s ease, color 0.15s ease',
+                              opacity: currentRating !== undefined && currentRating < star ? 0.35 : 1,
+                              transform: activeScore === star ? 'scale(1.2)' : isFilled ? 'scale(1.1)' : 'scale(1)'
+                            }}
+                            title={starDescriptions[star]}
+                            onMouseEnter={() => {
+                              if (currentRating === undefined) {
+                                setHoveredRatings(prev => ({ ...prev, [msg.historyId]: star }));
+                              }
+                            }}
+                          >
+                            <Star 
+                              size={26} 
+                              fill={isFilled ? '#f59e0b' : 'transparent'} 
+                              stroke={isFilled ? '#f59e0b' : 'currentColor'}
+                              strokeWidth={1.75}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* แสดงคำอธิบายระดับดาวที่กำลังเลือกหรือเลือกแล้ว */}
+                    <div style={{ marginTop: '6px', fontSize: '12px', minHeight: '18px', color: activeScore ? '#d97706' : 'var(--color-text-muted)' }}>
+                      {activeScore ? starDescriptions[activeScore] : 'เลือก 1 (น้อย) ถึง 5 (มาก)'}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         ))}
@@ -346,6 +376,9 @@ export default function ChatPage() {
             <Send size={20} />
           </button>
         </form>
+        <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center', marginTop: '6px', marginBottom: 0 }}>
+          ระบบนี้ให้คำแนะนำเบื้องต้นเท่านั้น ไม่สามารถเข้าถึงข้อมูลส่วนบุคคลหรือยอดหนี้ กยศ. ได้
+        </p>
       </div>
     </div>
   );
