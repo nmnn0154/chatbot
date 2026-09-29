@@ -31,8 +31,8 @@ const apiPlugin = () => ({
       if (isRateLimited(ip)) {
         return json(res, 429, { error: 'คุณส่งข้อความเร็วเกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง' });
       }
-      const { message } = await readJsonBody(req);
-      const { status, body } = await handleChat({ message, accessToken: getBearerToken(req) });
+      const { message, history } = await readJsonBody(req);
+      const { status, body } = await handleChat({ message, history, accessToken: getBearerToken(req) });
       json(res, status, body);
     });
 

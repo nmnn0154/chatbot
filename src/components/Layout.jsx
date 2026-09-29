@@ -287,6 +287,7 @@ export default function Layout({ children }) {
               <div className="sidebar-history-list" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {recentChats.map(chat => {
                   const isActive = currentChatId === chat.id;
+                  const chatTitle = chat.title || chat.user_message || (chat.messages && chat.messages[0]?.text) || 'บทสนทนา';
                   return (
                     <div
                       key={chat.id}
@@ -296,11 +297,11 @@ export default function Layout({ children }) {
                         to={`/chat?id=${chat.id}`}
                         className="sidebar-history-link"
                         onClick={closeSidebar}
-                        title={chat.user_message}
+                        title={chatTitle}
                       >
                         <History size={16} />
                         <span className="sidebar-history-text">
-                          {chat.user_message.length > 25 ? chat.user_message.substring(0, 25) + '...' : chat.user_message}
+                          {chatTitle.length > 25 ? chatTitle.substring(0, 25) + '...' : chatTitle}
                         </span>
                       </Link>
                       <button

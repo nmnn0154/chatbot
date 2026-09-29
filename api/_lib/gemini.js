@@ -57,22 +57,63 @@ export const FALLBACK_CHAT_MODELS = [
 ];
 
 /**
- * Generate a chat completion grounded on the given context chunks.
+ * Generate a chat completion grounded on the given context chunks and conversation history.
+ * @param {string} message
+ * @param {Array<{ content?: string, answer?: string }>} [contextChunks]
+ * @param {Array<{ role?: string, type?: string, text?: string, content?: string }>} [history]
  * @returns {Promise<string>} the model's text response
  */
-export async function generateChatResponse(message, contextChunks = []) {
+export async function generateChatResponse(message, contextChunks = [], history = []) {
   const genAI = getClient();
   const primary = chatModel();
   const modelsToTry = [primary, ...FALLBACK_CHAT_MODELS.filter(m => m !== primary)];
   const systemInstruction = buildSystemInstruction(contextChunks);
-  const contents = [{ role: 'user', parts: [{ text: message.trim() }] }];
+
+  // Build multi-turn contents from history + current message
+  const contents = [];
+  if (Array.isArray(history)) {
+    for (const item of history) {
+      const text = (item.text || item.content || '').trim();
+      if (!text) continue;
+      const role = (item.role === 'model' || item.role === 'bot' || item.type === 'bot') ? 'model' : 'user';
+
+      // Gemini requires first content to be from user
+      if (contents.length === 0 && role !== 'user') {
+        continue;
+      }
+
+      // Merge consecutive messages of the same role
+      if (contents.length > 0 && contents[contents.length - 1].role === role) {
+        contents[contents.length - 1].parts[0].text += `\n\n${text}`;
+      } else {
+        contents.push({ role, parts: [{ text }] });
+      }
+    }
+  }
+
+  // Ensure current message is appended as user role
+  const curText = message.trim();
+  if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+    contents[contents.length - 1].parts[0].text += `\n\n${curText}`;
+  } else {
+    contents.push({ role: 'user', parts: [{ text: curText }] });
+  }
+
+  // Keep last 20 turns to keep latency fast and within context budget
+  let trimmed = contents;
+  if (trimmed.length > 20) {
+    trimmed = trimmed.slice(trimmed.length - 20);
+    while (trimmed.length > 0 && trimmed[0].role !== 'user') {
+      trimmed.shift();
+    }
+  }
 
   let lastError = null;
   for (const modelName of modelsToTry) {
     try {
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent({
-        contents,
+        contents: trimmed,
         systemInstruction,
       });
       return result.response.text();

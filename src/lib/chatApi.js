@@ -28,7 +28,14 @@ async function generateEmbeddings(texts) {
  * `/api/chat` (see api/_lib/handlers.js). The client only forwards the message
  * plus the user's Supabase access token so RLS still applies during retrieval.
  */
-export async function sendChatMessage(message, userId) {
+/**
+ * Send a message to the Gemini-powered chatbot.
+ *
+ * Retrieval-Augmented Generation happens server-side in
+ * `/api/chat` (see api/_lib/handlers.js). The client forwards the message,
+ * previous conversation history for multi-turn chat, plus user's Supabase access token.
+ */
+export async function sendChatMessage(message, userId, history = []) {
   try {
     // Attach the signed-in user's JWT so the server can query document_chunks
     // under Row Level Security.
@@ -43,7 +50,7 @@ export async function sendChatMessage(message, userId) {
           'Content-Type': 'application/json',
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, history }),
       });
 
       if (!response.ok) {
@@ -70,21 +77,11 @@ export async function sendChatMessage(message, userId) {
       }
     }
 
-    // Step 3: Save chat history (anonymous - no user data stored in DB)
+    // Save chat Q&A pair to Supabase (anonymous - for analytics & rating)
     let historyId = null;
     const saved = await saveChatHistory(message, botResponse);
     if (saved) {
       historyId = saved.id;
-      // Step 4: Save to Local Storage (per-user key for separation)
-      saveChatToLocal(userId, {
-        id: saved.id,
-        user_message: saved.user_message,
-        bot_response: saved.bot_response,
-        created_at: saved.created_at,
-        rating: null
-      });
-      // Dispatch event to update Sidebar
-      window.dispatchEvent(new Event('chatHistoryUpdated'));
     }
 
     return { text: botResponse, id: historyId };
@@ -143,11 +140,52 @@ export async function rateChatResponse(historyId, rating, userId = null) {
 }
 
 // ==========================================
-// LOCAL STORAGE MANAGEMENT (Per-User Separation)
+// LOCAL STORAGE MANAGEMENT (Per-User Separation & Multi-turn Threads)
 // ==========================================
 
 const LOCAL_STORAGE_BASE = 'rmutsv_chatbot_history';
 const LEGACY_STORAGE_BASE = 'kku_chatbot_history';
+
+/**
+ * Normalise legacy single Q&A items or multi-turn thread items
+ */
+export function normalizeThread(item) {
+  if (!item || typeof item !== 'object') return null;
+  if (Array.isArray(item.messages)) {
+    return {
+      id: String(item.id),
+      title: item.title || item.messages[0]?.text?.substring(0, 40) || 'บทสนทนา',
+      messages: item.messages,
+      created_at: item.created_at || new Date().toISOString(),
+      updated_at: item.updated_at || item.created_at || new Date().toISOString(),
+    };
+  }
+  // Legacy single Q&A format
+  const title = item.user_message || 'บทสนทนา';
+  const createdAt = item.created_at || new Date().toISOString();
+  return {
+    id: String(item.id),
+    title: title.length > 40 ? title.substring(0, 40) + '...' : title,
+    messages: [
+      {
+        id: `${item.id}_u`,
+        type: 'user',
+        text: item.user_message || '',
+        time: createdAt,
+      },
+      {
+        id: `${item.id}_b`,
+        type: 'bot',
+        text: item.bot_response || '',
+        time: createdAt,
+        historyId: item.id,
+        rating: item.rating || null,
+      },
+    ],
+    created_at: createdAt,
+    updated_at: createdAt,
+  };
+}
 
 /**
  * Get localStorage key unique to each user
@@ -168,7 +206,10 @@ export function getChatHistory(userId = null) {
       data = localStorage.getItem(LEGACY_STORAGE_BASE);
     }
     if (data) {
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        return parsed.map(normalizeThread).filter(Boolean);
+      }
     }
   } catch (err) {
     console.error('Failed to read local chat history', err);
@@ -181,32 +222,74 @@ export function getChatHistory(userId = null) {
  */
 export function getChatById(id, userId = null) {
   const history = getChatHistory(userId);
-  return history.find(chat => chat.id === id) || null;
+  return history.find(chat => chat.id === String(id)) || null;
 }
 
 /**
- * Save a chat item to localStorage (per-user key)
+ * Save an entire multi-turn thread to localStorage (per-user key)
  */
-export function saveChatToLocal(userId, chatItem) {
+export function saveThreadToLocal(userId, thread) {
   const key = getStorageKey(userId);
   const history = getChatHistory(userId);
-  history.unshift(chatItem);
+  const existingIdx = history.findIndex(t => t.id === String(thread.id));
+
+  const cleanThread = {
+    id: String(thread.id),
+    title: thread.title || thread.messages?.[0]?.text?.substring(0, 40) || 'บทสนทนา',
+    created_at: thread.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    messages: thread.messages || [],
+  };
+
+  if (existingIdx !== -1) {
+    // Keep original created_at
+    cleanThread.created_at = history[existingIdx].created_at;
+    history.splice(existingIdx, 1);
+    history.unshift(cleanThread);
+  } else {
+    history.unshift(cleanThread);
+  }
+
   if (history.length > 30) history.length = 30;
   localStorage.setItem(key, JSON.stringify(history));
+  window.dispatchEvent(new Event('chatHistoryUpdated'));
+}
+
+/**
+ * Backward-compatible saveChatToLocal
+ */
+export function saveChatToLocal(userId, chatItem) {
+  if (chatItem.messages && Array.isArray(chatItem.messages)) {
+    saveThreadToLocal(userId, chatItem);
+  } else {
+    const thread = normalizeThread(chatItem);
+    if (thread) saveThreadToLocal(userId, thread);
+  }
 }
 
 export function getLocalChatById(id) {
-  // Fallback for legacy usage
   return getChatById(id, null);
 }
 
 export function updateLocalChatRating(id, rating, userId = null) {
   const key = getStorageKey(userId);
   const history = getChatHistory(userId);
-  const chatIndex = history.findIndex(chat => chat.id === id);
-  if (chatIndex !== -1) {
-    history[chatIndex].rating = rating;
+  let changed = false;
+
+  for (const thread of history) {
+    if (Array.isArray(thread.messages)) {
+      for (const msg of thread.messages) {
+        if (msg.historyId === id || msg.id === id) {
+          msg.rating = rating;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  if (changed) {
     localStorage.setItem(key, JSON.stringify(history));
+    window.dispatchEvent(new Event('chatHistoryUpdated'));
   }
 }
 
@@ -217,8 +300,9 @@ export function deleteChatFromLocal(id, userId = null) {
   try {
     const key = getStorageKey(userId);
     const history = getChatHistory(userId);
-    const updated = history.filter(chat => chat.id !== id);
+    const updated = history.filter(chat => chat.id !== String(id));
     localStorage.setItem(key, JSON.stringify(updated));
+    window.dispatchEvent(new Event('chatHistoryUpdated'));
     return updated;
   } catch (err) {
     console.error('Failed to delete chat from local storage:', err);
@@ -236,6 +320,7 @@ export function clearAllChatHistory(userId = null) {
     if (!userId) {
       localStorage.removeItem(LEGACY_STORAGE_BASE);
     }
+    window.dispatchEvent(new Event('chatHistoryUpdated'));
   } catch (err) {
     console.error('Failed to clear chat history:', err);
   }

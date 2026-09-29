@@ -30,9 +30,9 @@ export function isRateLimited(ip) {
 // ---- /api/chat ----------------------------------------------------------------
 
 /**
- * @param {{ message: string, accessToken?: string }} params
+ * @param {{ message: string, history?: Array<any>, accessToken?: string }} params
  */
-export async function handleChat({ message, accessToken }) {
+export async function handleChat({ message, history = [], accessToken }) {
   if (!message || typeof message !== 'string' || message.trim().length === 0) {
     return { status: 400, body: { error: 'Message is required and must be a non-empty string' } };
   }
@@ -42,10 +42,19 @@ export async function handleChat({ message, accessToken }) {
 
   try {
     // 1. Retrieve grounding context (server-side RAG)
-    const chunks = await retrieveContext(message, accessToken);
+    // If message is short or contextual (e.g. "แล้วข้อ 2 ล่ะ"), also append last user question to retrieval query
+    let queryForRetrieval = message;
+    if (message.length < 30 && Array.isArray(history) && history.length > 0) {
+      const lastUser = [...history].reverse().find(h => (h.role === 'user' || h.type === 'user'));
+      if (lastUser && lastUser.text) {
+        queryForRetrieval = `${lastUser.text} ${message}`;
+      }
+    }
 
-    // 2. Generate the grounded answer
-    const response = await generateChatResponse(message, chunks);
+    const chunks = await retrieveContext(queryForRetrieval, accessToken);
+
+    // 2. Generate the grounded answer with conversation history
+    const response = await generateChatResponse(message, chunks, history);
 
     return {
       status: 200,

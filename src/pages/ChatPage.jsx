@@ -1,56 +1,58 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { sendChatMessage, getChatById, rateChatResponse, deleteChatFromLocal } from '../lib/chatApi';
+import { sendChatMessage, getChatById, rateChatResponse, deleteChatFromLocal, saveThreadToLocal } from '../lib/chatApi';
 import { confirmDelete, showSuccess } from '../lib/swalHelper';
-import { Send, AlertTriangle, Bot, Sparkles, Star, Trash2, Plus } from 'lucide-react';
+import { Send, Bot, Sparkles, Star, Trash2, Plus } from 'lucide-react';
 import DOMPurify from 'dompurify';
-
 
 export default function ChatPage() {
   const { user, profile } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [currentChatTitle, setCurrentChatTitle] = useState('');
   const [ratings, setRatings] = useState({}); // Track local ratings by historyId
   const [hoveredRatings, setHoveredRatings] = useState({}); // Track hover state by historyId
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const activeChatRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
   const chatId = queryParams.get('id');
 
   useEffect(() => {
-    function loadChat() {
-      if (chatId) {
-        const chat = getChatById(chatId, user?.id);
-        if (chat) {
-          setMessages([
-            {
-              id: chat.id + '_u',
-              type: 'user',
-              text: chat.user_message,
-              time: chat.created_at,
-            },
-            {
-              id: chat.id + '_b',
-              type: 'bot',
-              text: chat.bot_response,
-              time: chat.created_at,
-              historyId: chat.id,
-            }
-          ]);
-          if (chat.rating) {
-            setRatings(prev => ({ ...prev, [chat.id]: chat.rating }));
-          }
-        }
-      } else {
-        setMessages([]);
-      }
+    // If the active chat already matches chatId in URL, avoid resetting state
+    if (chatId && activeChatRef.current === chatId) {
+      return;
     }
-    loadChat();
-  }, [chatId, user?.id]);
+
+    if (chatId) {
+      const thread = getChatById(chatId, user?.id);
+      if (thread) {
+        activeChatRef.current = thread.id;
+        setMessages(thread.messages || []);
+        setCurrentChatTitle(thread.title || 'บทสนทนา');
+        const initialRatings = {};
+        (thread.messages || []).forEach(m => {
+          if (m.historyId && m.rating) {
+            initialRatings[m.historyId] = m.rating;
+          }
+        });
+        setRatings(initialRatings);
+      } else {
+        activeChatRef.current = null;
+        navigate('/chat', { replace: true });
+      }
+    } else {
+      activeChatRef.current = null;
+      setMessages([]);
+      setCurrentChatTitle('');
+      setRatings({});
+      setHoveredRatings({});
+    }
+  }, [chatId, user?.id, navigate]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -65,37 +67,72 @@ export default function ChatPage() {
     if (!text || isTyping) return;
 
     const userMessage = {
-      id: Date.now(),
+      id: `u_${Date.now()}`,
       type: 'user',
       text,
-      time: new Date(),
+      time: new Date().toISOString(),
     };
+
+    // Prepare previous history for Gemini context
+    const historyPayload = messages
+      .filter((m) => m.type === 'user' || m.type === 'bot')
+      .map((m) => ({
+        role: m.type === 'bot' ? 'model' : 'user',
+        text: m.text,
+      }));
+
+    const currentThreadId = activeChatRef.current || chatId || `chat_${Date.now()}`;
+    const isNewThread = !activeChatRef.current && !chatId;
 
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsTyping(true);
 
     try {
-      const { text: responseText, id: historyId } = await sendChatMessage(text, user?.id);
+      const { text: responseText, id: historyId } = await sendChatMessage(
+        text,
+        user?.id,
+        historyPayload
+      );
+
       const botMessage = {
-        id: historyId || Date.now() + 1,
+        id: historyId || `b_${Date.now()}`,
         type: 'bot',
         text: responseText,
-        time: new Date(),
-        historyId: historyId, // Store historyId to rate it later
+        time: new Date().toISOString(),
+        historyId: historyId,
       };
-      setMessages((prev) => [...prev, botMessage]);
 
-      // If we are looking at a history item, submitting a new message should perhaps clear the history ID from URL
-      if (chatId) {
-        navigate('/chat', { replace: true });
+      setMessages((prev) => {
+        const updated = [...prev, botMessage];
+        const title =
+          currentChatTitle || (text.length > 35 ? text.substring(0, 35) + '...' : text);
+
+        const thread = {
+          id: currentThreadId,
+          title,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          messages: updated,
+        };
+
+        saveThreadToLocal(user?.id, thread);
+        return updated;
+      });
+
+      if (isNewThread) {
+        activeChatRef.current = currentThreadId;
+        const newTitle = text.length > 35 ? text.substring(0, 35) + '...' : text;
+        setCurrentChatTitle(newTitle);
+        navigate(`/chat?id=${currentThreadId}`, { replace: true });
       }
     } catch (error) {
+      console.error('Send message error:', error);
       const errorMessage = {
-        id: Date.now() + 1,
+        id: `err_${Date.now()}`,
         type: 'bot',
         text: 'ขออภัยครับ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง',
-        time: new Date(),
+        time: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -140,23 +177,23 @@ export default function ChatPage() {
     });
   };
 
-
-
   const userInitial = profile?.full_name?.charAt(0) || 'U';
 
   const handleDeleteCurrentChat = async () => {
-    if (!chatId) return;
+    const targetId = chatId || activeChatRef.current;
+    if (!targetId) return;
+
     const isConfirmed = await confirmDelete({
       title: 'ลบประวัติการสนทนานี้?',
-      text: 'ข้อความในประวัตินี้จะถูกลบถาวร ไม่สามารถกู้คืนได้',
+      text: 'ข้อความในการสนทนานี้จะถูกลบถาวร ไม่สามารถกู้คืนได้',
       confirmText: 'ใช่, ลบเลย',
       cancelText: 'ยกเลิก',
     });
 
     if (isConfirmed) {
-      deleteChatFromLocal(chatId, user?.id);
-      window.dispatchEvent(new Event('chatHistoryUpdated'));
+      deleteChatFromLocal(targetId, user?.id);
       showSuccess('ลบแชทเรียบร้อยแล้ว', '', 1200);
+      activeChatRef.current = null;
       navigate('/chat');
     }
   };
@@ -174,14 +211,27 @@ export default function ChatPage() {
           borderBottom: '1px solid var(--color-border)',
           fontSize: 'var(--text-sm)',
           color: 'var(--color-text-secondary)',
+          gap: '12px',
         }}>
-          <span>กำลังดูประวัติการสนทนา</span>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+            <span style={{ fontSize: '13px', whiteSpace: 'nowrap' }}>บทสนทนา:</span>
+            <strong style={{
+              color: 'var(--color-text)',
+              fontSize: '13px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {currentChatTitle || 'ประวัติการสนทนา'}
+            </strong>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
             <button
               type="button"
               className="btn btn-ghost"
               style={{ padding: '4px 10px', fontSize: 'var(--text-xs)', height: 'auto', display: 'flex', alignItems: 'center', gap: '4px' }}
               onClick={() => navigate('/chat')}
+              title="เริ่มการสนทนาใหม่"
             >
               <Plus size={14} />
               แชทใหม่
@@ -191,6 +241,7 @@ export default function ChatPage() {
               className="btn btn-ghost"
               style={{ padding: '4px 10px', fontSize: 'var(--text-xs)', height: 'auto', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}
               onClick={handleDeleteCurrentChat}
+              title="ลบการสนทนานี้"
             >
               <Trash2 size={14} />
               ลบแชทนี้
