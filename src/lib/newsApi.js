@@ -2,9 +2,36 @@ import { supabase } from './supabase';
 
 const BUCKET = 'news-images';
 
+export function isUuid(str) {
+  if (typeof str !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
+export function generateUuid() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+export const LEGACY_NEWS_ID_MAP = {
+  'news_rmutsv_1': 'b0000000-0000-0000-0000-000000000001',
+  'news_rmutsv_2': 'b0000000-0000-0000-0000-000000000002',
+  'news_rmutsv_3': 'b0000000-0000-0000-0000-000000000003',
+  'news_rmutsv_4': 'b0000000-0000-0000-0000-000000000004',
+};
+
+export const REVERSE_NEWS_ID_MAP = Object.fromEntries(
+  Object.entries(LEGACY_NEWS_ID_MAP).map(([k, v]) => [v, k])
+);
+
 export const RMUTSV_DEFAULT_NEWS = [
   {
-    id: 'news_rmutsv_1',
+    id: 'b0000000-0000-0000-0000-000000000001',
     title: 'ประกาศกำหนดการยื่นกู้ยืมเงิน กยศ. ภาคเรียนที่ 1/2568 มทร.ศรีวิชัย สงขลา',
     content: `กองพัฒนานักศึกษา มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย ประกาศกำหนดการดำเนินงานกองทุนเงินให้กู้ยืมเพื่อการศึกษา (กยศ.) ประจำภาคเรียนที่ 1 ปีการศึกษา 2568:
 
@@ -24,7 +51,7 @@ export const RMUTSV_DEFAULT_NEWS = [
     created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
   },
   {
-    id: 'news_rmutsv_2',
+    id: 'b0000000-0000-0000-0000-000000000002',
     title: 'โครงการบริจาคโลหิต ร่วมใจทำความดี นับชั่วโมงจิตอาสา กยศ. 6 ชั่วโมง',
     content: `งานแนะแนวและทุนการศึกษา กองพัฒนานักศึกษา มทร.ศรีวิชัย ร่วมกับ ภาคบริการโลหิตแห่งชาติที่ 12 จังหวัดสงขลา ขอเชิญชวนนักศึกษาและบุคลากร ร่วมบริจาคโลหิตเพื่อช่วยเหลือผู้ป่วย
 
@@ -39,7 +66,7 @@ export const RMUTSV_DEFAULT_NEWS = [
     created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
   },
   {
-    id: 'news_rmutsv_3',
+    id: 'b0000000-0000-0000-0000-000000000003',
     title: 'แจ้งเตือนการลงนามในแบบยืนยันการเบิกเงินกู้ยืม กยศ. ค่าเล่าเรียนและค่าครองชีพ',
     content: `แจ้งนักศึกษาผู้กู้ยืมเงิน กยศ. ทุกคณะ ทุกชั้นปี มทร.ศรีวิชัย:
 
@@ -55,7 +82,7 @@ export const RMUTSV_DEFAULT_NEWS = [
     created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 8).toISOString(),
   },
   {
-    id: 'news_rmutsv_4',
+    id: 'b0000000-0000-0000-0000-000000000004',
     title: 'ประชาสัมพันธ์: กฎหมาย กยศ. ปรับปรุงใหม่ ลดเบี้ยปรับเหลือ 0.5% ต่อปี และยกเลิกผู้ค้ำประกัน',
     content: `กองทุนเงินให้กู้ยืมเพื่อการศึกษา (กยศ.) ร่วมกับ มทร.ศรีวิชัย ขอประชาสัมพันธ์สาระสำคัญของ พ.ร.บ. กองทุนเงินให้กู้ยืมเพื่อการศึกษา ฉบับปรับปรุงใหม่:
 
@@ -71,6 +98,93 @@ export const RMUTSV_DEFAULT_NEWS = [
     created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString(),
   },
 ];
+
+const NEWS_STORAGE_KEY = 'rmutsv_announcements_cache';
+const NEWS_DELETED_IDS_KEY = 'rmutsv_announcements_deleted_ids';
+const NEWS_SEEDED_KEY = 'rmutsv_announcements_seeded_v2';
+
+export function getDeletedNewsIds() {
+  try {
+    const raw = localStorage.getItem(NEWS_DELETED_IDS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function markDeletedNewsId(id) {
+  if (!id) return;
+  try {
+    const list = getDeletedNewsIds();
+    const actualId = LEGACY_NEWS_ID_MAP[id] || id;
+    const legacyId = REVERSE_NEWS_ID_MAP[id] || null;
+    let changed = false;
+
+    for (const item of [id, actualId, legacyId]) {
+      if (item && !list.includes(item)) {
+        list.push(item);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      localStorage.setItem(NEWS_DELETED_IDS_KEY, JSON.stringify(list));
+    }
+  } catch (e) {
+    console.warn('Failed to mark deleted news id:', e);
+  }
+}
+
+export function filterOutDeletedNews(newsList) {
+  if (!Array.isArray(newsList)) return [];
+  const deleted = getDeletedNewsIds();
+  if (deleted.length === 0) return newsList;
+  return newsList.filter(
+    (item) =>
+      !deleted.includes(item.id) &&
+      !deleted.includes(LEGACY_NEWS_ID_MAP[item.id]) &&
+      !deleted.includes(REVERSE_NEWS_ID_MAP[item.id])
+  );
+}
+
+function getCachedNews() {
+  try {
+    const raw = localStorage.getItem(NEWS_STORAGE_KEY);
+    if (raw === null) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+
+    let modified = false;
+    const migrated = parsed.map((item) => {
+      if (LEGACY_NEWS_ID_MAP[item.id]) {
+        modified = true;
+        return { ...item, id: LEGACY_NEWS_ID_MAP[item.id] };
+      }
+      if (!isUuid(item.id)) {
+        modified = true;
+        return { ...item, id: generateUuid() };
+      }
+      return item;
+    });
+
+    const filtered = filterOutDeletedNews(migrated);
+    if (modified || filtered.length !== parsed.length) {
+      localStorage.setItem(NEWS_STORAGE_KEY, JSON.stringify(filtered));
+    }
+    return filtered;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedNews(newsList) {
+  try {
+    const clean = filterOutDeletedNews(newsList);
+    localStorage.setItem(NEWS_STORAGE_KEY, JSON.stringify(clean));
+  } catch (e) {
+    console.warn('Failed to cache news:', e);
+  }
+}
 
 /**
  * Upload an image to Supabase Storage and return its public URL.
@@ -89,8 +203,12 @@ export async function uploadNewsImage(file) {
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
     return data.publicUrl;
   } catch (error) {
-    console.error('Failed to upload image:', error);
-    return null;
+    console.warn('Failed to upload image to Supabase storage, using data URL fallback:', error);
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    });
   }
 }
 
@@ -99,13 +217,13 @@ export async function uploadNewsImage(file) {
  */
 export async function deleteNewsImage(publicUrl) {
   try {
-    if (!publicUrl) return;
+    if (!publicUrl || typeof publicUrl !== 'string') return;
     const parts = publicUrl.split(`/storage/v1/object/public/${BUCKET}/`);
     if (parts.length < 2) return;
     const { error } = await supabase.storage.from(BUCKET).remove([parts[1]]);
     if (error) throw error;
   } catch (error) {
-    console.error('Failed to delete image:', error);
+    console.warn('Failed to delete image from storage:', error);
   }
 }
 
@@ -113,100 +231,188 @@ export async function deleteNewsImage(publicUrl) {
  * Fetch all published news (for users)
  */
 export async function getPublishedNews() {
-  try {
-    const { data, error } = await supabase
-      .from('announcements')
-      .select('*')
-      .eq('is_published', true)
-      .order('created_at', { ascending: false });
-
-    if (error || !data || data.length === 0) {
-      return RMUTSV_DEFAULT_NEWS;
-    }
-    return data;
-  } catch (error) {
-    console.warn('Using fallback RMUTSV news:', error);
-    return RMUTSV_DEFAULT_NEWS;
-  }
+  const all = await getAllNews();
+  return all.filter((n) => n.is_published !== false);
 }
 
 /**
  * Fetch all news (for admins)
  */
 export async function getAllNews() {
+  const cached = getCachedNews();
+  const isSeeded = localStorage.getItem(NEWS_SEEDED_KEY);
+
   try {
     const { data, error } = await supabase
       .from('announcements')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      return RMUTSV_DEFAULT_NEWS;
+    if (!error && Array.isArray(data)) {
+      if (data.length === 0 && !isSeeded && (!cached || cached.length === 0)) {
+        // Initial auto-seed default items
+        localStorage.setItem(NEWS_SEEDED_KEY, 'true');
+        const toSeed = filterOutDeletedNews(RMUTSV_DEFAULT_NEWS);
+        try {
+          await supabase.from('announcements').insert(toSeed);
+        } catch (e) {
+          console.warn('Auto-seed news to Supabase skipped:', e);
+        }
+        setCachedNews(toSeed);
+        return toSeed;
+      }
+
+      // Filter out deleted from remote data
+      const cleanRemote = filterOutDeletedNews(data);
+
+      // Merge with locally created/modified items so they are not wiped out
+      if (cached && cached.length > 0) {
+        const remoteIds = new Set(cleanRemote.map((r) => r.id));
+        const localOnly = cached.filter((c) => !remoteIds.has(c.id));
+        const merged = [...cleanRemote, ...localOnly];
+        setCachedNews(merged);
+        localStorage.setItem(NEWS_SEEDED_KEY, 'true');
+        return merged;
+      }
+
+      setCachedNews(cleanRemote);
+      localStorage.setItem(NEWS_SEEDED_KEY, 'true');
+      return cleanRemote;
     }
-    return data;
   } catch (error) {
-    console.warn('Using fallback RMUTSV all news:', error);
-    return RMUTSV_DEFAULT_NEWS;
+    console.warn('Using cached RMUTSV news:', error);
   }
+
+  // Fallback to local cache if present
+  if (cached !== null) {
+    return filterOutDeletedNews(cached);
+  }
+
+  // First time initialization
+  if (!isSeeded) {
+    localStorage.setItem(NEWS_SEEDED_KEY, 'true');
+    const defaults = filterOutDeletedNews(RMUTSV_DEFAULT_NEWS);
+    setCachedNews(defaults);
+    return defaults;
+  }
+
+  return [];
 }
 
 /**
  * Create a new announcement (with optional image)
  */
 export async function createNews(title, content, isPublished = true, imageFile = null) {
+  let image_url = null;
+  if (imageFile) image_url = await uploadNewsImage(imageFile);
+
+  const newNews = {
+    id: generateUuid(),
+    title: title.trim(),
+    content: content.trim(),
+    is_published: isPublished !== false,
+    image_url,
+    created_at: new Date().toISOString(),
+  };
+
   try {
-    let image_url = null;
-    if (imageFile) image_url = await uploadNewsImage(imageFile);
-
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('announcements')
-      .insert({ title, content, is_published: isPublished, image_url });
+      .insert([newNews])
+      .select()
+      .single();
 
-    if (error) throw error;
-    return true;
+    if (!error && data) {
+      const current = getCachedNews() || [];
+      setCachedNews([data, ...current]);
+      return true;
+    }
   } catch (error) {
-    console.error('Failed to create news:', error);
-    return false;
+    console.warn('Supabase createNews failed, saving locally:', error);
   }
+
+  // Local fallback
+  const current = getCachedNews() || [];
+  setCachedNews([newNews, ...current]);
+  return true;
 }
 
 /**
  * Update an announcement
  */
 export async function updateNews(id, updates, imageFile = null, oldImageUrl = null, removeImage = false) {
+  const actualId = LEGACY_NEWS_ID_MAP[id] || id;
+  const payload = { ...updates };
+
   try {
     if (imageFile) {
       const newUrl = await uploadNewsImage(imageFile);
       if (newUrl) {
-        updates.image_url = newUrl;
+        payload.image_url = newUrl;
         if (oldImageUrl) await deleteNewsImage(oldImageUrl);
       }
     } else if (removeImage) {
-      updates.image_url = null;
+      payload.image_url = null;
       if (oldImageUrl) await deleteNewsImage(oldImageUrl);
     }
 
-    const { error } = await supabase.from('announcements').update(updates).eq('id', id);
-    if (error) throw error;
-    return true;
+    if (isUuid(actualId)) {
+      const { data, error } = await supabase
+        .from('announcements')
+        .update(payload)
+        .eq('id', actualId)
+        .select()
+        .single();
+
+      if (!error && data) {
+        const current = getCachedNews() || [];
+        setCachedNews(current.map((n) => (n.id === id || n.id === actualId ? data : n)));
+        return true;
+      }
+    }
   } catch (error) {
-    console.error('Failed to update news:', error);
-    return false;
+    console.warn('Supabase updateNews failed, updating local cache:', error);
   }
+
+  // Local fallback
+  const current = getCachedNews() || [];
+  const updatedList = current.map((n) =>
+    n.id === id || n.id === actualId ? { ...n, ...payload, id: actualId } : n
+  );
+  setCachedNews(updatedList);
+  return true;
 }
 
 /**
  * Delete an announcement
  */
 export async function deleteNews(id, imageUrl = null) {
+  const actualId = LEGACY_NEWS_ID_MAP[id] || id;
+
+  // 1. Mark permanently in deleted list
+  markDeletedNewsId(id);
+  markDeletedNewsId(actualId);
+  localStorage.setItem(NEWS_SEEDED_KEY, 'true');
+
+  // 2. Remove from local cache immediately
+  const cached = getCachedNews();
+  const current = cached !== null ? cached : filterOutDeletedNews(RMUTSV_DEFAULT_NEWS);
+  const remaining = current.filter((n) => n.id !== id && n.id !== actualId);
+  setCachedNews(remaining);
+
+  // 3. Delete image and remote entry
   try {
     if (imageUrl) await deleteNewsImage(imageUrl);
 
-    const { error } = await supabase.from('announcements').delete().eq('id', id);
-    if (error) throw error;
-    return true;
+    if (isUuid(actualId)) {
+      const { error } = await supabase.from('announcements').delete().eq('id', actualId);
+      if (error && error.code !== '22P02') {
+        console.warn('Supabase deleteNews error:', error);
+      }
+    }
   } catch (error) {
-    console.error('Failed to delete news:', error);
-    return false;
+    console.warn('Supabase deleteNews failed (continuing with local deletion):', error);
   }
+
+  return true;
 }

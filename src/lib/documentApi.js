@@ -39,6 +39,10 @@ export const LEGACY_ID_MAP = {
   'doc_rmutsv_deferment': 'a0000000-0000-0000-0000-000000000107',
 };
 
+export const REVERSE_LEGACY_MAP = Object.fromEntries(
+  Object.entries(LEGACY_ID_MAP).map(([k, v]) => [v, k])
+);
+
 export const RMUTSV_DEFAULT_DOCUMENTS = [
   {
     id: 'a0000000-0000-0000-0000-000000000102',
@@ -184,8 +188,18 @@ export function markDeletedId(id) {
   if (!id) return;
   try {
     const list = getDeletedIds();
-    if (!list.includes(id)) {
-      list.push(id);
+    const actualId = LEGACY_ID_MAP[id] || id;
+    const legacyId = REVERSE_LEGACY_MAP[id] || null;
+    let changed = false;
+
+    for (const item of [id, actualId, legacyId]) {
+      if (item && !list.includes(item)) {
+        list.push(item);
+        changed = true;
+      }
+    }
+
+    if (changed) {
       localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(list));
     }
   } catch (e) {
@@ -198,7 +212,10 @@ export function filterOutDeleted(docs) {
   const deleted = getDeletedIds();
   if (deleted.length === 0) return docs;
   return docs.filter(
-    (d) => !deleted.includes(d.id) && !deleted.includes(LEGACY_ID_MAP[d.id])
+    (d) =>
+      !deleted.includes(d.id) &&
+      !deleted.includes(LEGACY_ID_MAP[d.id]) &&
+      !deleted.includes(REVERSE_LEGACY_MAP[d.id])
   );
 }
 
@@ -208,9 +225,9 @@ export function filterOutDeleted(docs) {
 function getCachedDocuments() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
+    if (raw === null) return null;
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    if (!Array.isArray(parsed)) return null;
 
     let modified = false;
     const migrated = parsed.map((doc) => {
@@ -355,39 +372,17 @@ export function formatFileSize(bytes) {
  * Fetch published documents for general students/users
  */
 export async function getPublishedDocuments() {
-  try {
-    const { data, error } = await supabase
-      .from('document_templates')
-      .select('*')
-      .eq('is_published', true)
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: false });
-
-    if (!error && Array.isArray(data)) {
-      const isSeeded = localStorage.getItem(SEEDED_KEY);
-      if (data.length === 0 && !isSeeded) {
-        // Not yet seeded, fallback to filtered defaults
-        const defaults = filterOutDeleted(RMUTSV_DEFAULT_DOCUMENTS).filter((d) => d.is_published !== false);
-        return defaults;
-      }
-      return filterOutDeleted(data);
-    }
-
-    const cached = getCachedDocuments();
-    if (cached) return filterOutDeleted(cached).filter((d) => d.is_published !== false);
-    return filterOutDeleted(RMUTSV_DEFAULT_DOCUMENTS).filter((d) => d.is_published !== false);
-  } catch (error) {
-    console.warn('Using fallback RMUTSV document templates:', error);
-    const cached = getCachedDocuments();
-    const list = cached || RMUTSV_DEFAULT_DOCUMENTS;
-    return filterOutDeleted(list).filter((d) => d.is_published !== false);
-  }
+  const all = await getAllDocuments();
+  return all.filter((d) => d.is_published !== false);
 }
 
 /**
  * Fetch all documents for Admin (including drafts)
  */
 export async function getAllDocuments() {
+  const cached = getCachedDocuments();
+  const isSeeded = localStorage.getItem(SEEDED_KEY);
+
   try {
     const { data, error } = await supabase
       .from('document_templates')
@@ -396,53 +391,56 @@ export async function getAllDocuments() {
       .order('created_at', { ascending: false });
 
     if (!error && Array.isArray(data)) {
-      const isSeeded = localStorage.getItem(SEEDED_KEY);
-      if (data.length === 0 && !isSeeded) {
+      if (data.length === 0 && !isSeeded && (!cached || cached.length === 0)) {
         // Table exists in Supabase but has 0 rows: try auto-seeding
-        const toSeed = filterOutDeleted(RMUTSV_DEFAULT_DOCUMENTS).map((doc) => ({
-          id: doc.id,
-          title: doc.title,
-          category: doc.category,
-          description: doc.description,
-          guide_notes: doc.guide_notes,
-          file_name: doc.file_name,
-          file_size: doc.file_size,
-          file_type: doc.file_type,
-          download_count: doc.download_count || 0,
-          is_published: doc.is_published,
-          sort_order: doc.sort_order,
-          preview_image_url: doc.preview_image_url || null,
-          preview_images: doc.preview_images || [],
-        }));
-
+        const toSeed = filterOutDeleted(RMUTSV_DEFAULT_DOCUMENTS);
         if (toSeed.length > 0) {
-          const { data: inserted, error: insertError } = await supabase
-            .from('document_templates')
-            .insert(toSeed)
-            .select();
-
-          if (!insertError && inserted && inserted.length > 0) {
-            localStorage.setItem(SEEDED_KEY, 'true');
-            setCachedDocuments(inserted);
-            return filterOutDeleted(inserted);
+          try {
+            await supabase.from('document_templates').insert(toSeed);
+          } catch (e) {
+            console.warn('Auto-seed documents to Supabase skipped:', e);
           }
         }
         localStorage.setItem(SEEDED_KEY, 'true');
-      } else {
-        localStorage.setItem(SEEDED_KEY, 'true');
-        setCachedDocuments(data);
-        return filterOutDeleted(data);
+        setCachedDocuments(toSeed);
+        return toSeed;
       }
-    }
 
-    const cached = getCachedDocuments();
-    if (cached) return filterOutDeleted(cached);
-    return filterOutDeleted(RMUTSV_DEFAULT_DOCUMENTS);
+      // Filter out deleted from remote data
+      const cleanRemote = filterOutDeleted(data);
+
+      // Merge with any locally added/updated documents that aren't in Supabase
+      if (cached && cached.length > 0) {
+        const remoteIds = new Set(cleanRemote.map((r) => r.id));
+        const localOnly = cached.filter((c) => !remoteIds.has(c.id));
+        const merged = [...cleanRemote, ...localOnly];
+        setCachedDocuments(merged);
+        localStorage.setItem(SEEDED_KEY, 'true');
+        return merged;
+      }
+
+      setCachedDocuments(cleanRemote);
+      localStorage.setItem(SEEDED_KEY, 'true');
+      return cleanRemote;
+    }
   } catch (error) {
     console.warn('Using fallback RMUTSV all document templates:', error);
-    const cached = getCachedDocuments();
-    return filterOutDeleted(cached || RMUTSV_DEFAULT_DOCUMENTS);
   }
+
+  // Fallback to cache if available
+  if (cached !== null) {
+    return filterOutDeleted(cached);
+  }
+
+  // First time initialization if never seeded
+  if (!isSeeded) {
+    localStorage.setItem(SEEDED_KEY, 'true');
+    const defaults = filterOutDeleted(RMUTSV_DEFAULT_DOCUMENTS);
+    setCachedDocuments(defaults);
+    return defaults;
+  }
+
+  return [];
 }
 
 /**
@@ -596,8 +594,14 @@ export async function deleteDocument(id, fileUrl = null, previewImages = null) {
   markDeletedId(actualId);
   localStorage.setItem(SEEDED_KEY, 'true');
 
+  // 2. Update local cache immediately
+  const cached = getCachedDocuments();
+  const current = cached !== null ? cached : filterOutDeleted(RMUTSV_DEFAULT_DOCUMENTS);
+  const remaining = current.filter((d) => d.id !== id && d.id !== actualId);
+  setCachedDocuments(remaining);
+
+  // 3. Delete files if present
   try {
-    // Delete files if present
     if (fileUrl && fileUrl.includes(DOC_FILES_BUCKET)) {
       const parts = fileUrl.split(`/storage/v1/object/public/${DOC_FILES_BUCKET}/`);
       if (parts[1]) await supabase.storage.from(DOC_FILES_BUCKET).remove([parts[1]]);
@@ -611,13 +615,9 @@ export async function deleteDocument(id, fileUrl = null, previewImages = null) {
       if (error && error.code !== '22P02') console.warn('Supabase delete error:', error);
     }
   } catch (e) {
-    console.warn('Delete error:', e);
+    console.warn('Supabase deleteDocument failed (continuing with local deletion):', e);
   }
 
-  // 2. Update local cache
-  const current = getCachedDocuments() || filterOutDeleted(RMUTSV_DEFAULT_DOCUMENTS);
-  const remaining = current.filter((d) => d.id !== id && d.id !== actualId);
-  setCachedDocuments(remaining);
   return true;
 }
 

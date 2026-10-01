@@ -622,8 +622,11 @@ export default function AdminNews() {
                     width: '100%',
                     aspectRatio: '16 / 9',
                     minHeight: '200px',
-                    background: 'var(--color-bg-tertiary)',
+                    background: 'var(--color-bg-secondary, #f8fafc)',
                     overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
                   {news.image_url ? (
@@ -632,9 +635,11 @@ export default function AdminNews() {
                       alt={news.title}
                       onClick={() => setPreviewImageModal(news.image_url)}
                       style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        width: 'auto',
+                        height: 'auto',
+                        objectFit: 'contain',
                         display: 'block',
                         cursor: 'zoom-in',
                         transition: 'transform 0.3s ease',
@@ -904,9 +909,12 @@ export default function AdminNews() {
                     minWidth: '240px',
                     position: 'relative',
                     aspectRatio: '16 / 9',
-                    background: 'var(--color-bg-tertiary)',
+                    background: 'var(--color-bg-secondary, #f8fafc)',
                     overflow: 'hidden',
                     flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
                   {news.image_url ? (
@@ -915,9 +923,11 @@ export default function AdminNews() {
                       alt={news.title}
                       onClick={() => setPreviewImageModal(news.image_url)}
                       style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        width: 'auto',
+                        height: 'auto',
+                        objectFit: 'contain',
                         cursor: 'zoom-in',
                         transition: 'transform 0.3s ease',
                       }}
@@ -1629,11 +1639,11 @@ export default function AdminNews() {
                       }}
                     >
                       {imagePreview && (
-                        <div style={{ width: '100%', aspectRatio: '16 / 9', maxHeight: 340, overflow: 'hidden', background: 'var(--color-bg-tertiary)' }}>
+                        <div style={{ width: '100%', minHeight: 220, maxHeight: 380, overflow: 'hidden', background: 'var(--color-bg-secondary, #f8fafc)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <img
                             src={imagePreview}
                             alt=""
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                            style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block' }}
                           />
                         </div>
                       )}
