@@ -372,17 +372,31 @@ export function formatFileSize(bytes) {
  * Fetch published documents for general students/users
  */
 export async function getPublishedDocuments() {
-  const all = await getAllDocuments();
-  return all.filter((d) => d.is_published !== false);
+  try {
+    const { data, error } = await supabase
+      .from('document_templates')
+      .select('*')
+      .eq('is_published', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      return data;
+    }
+    if (error) {
+      console.warn('Error fetching published document templates from Supabase:', error);
+    }
+  } catch (error) {
+    console.warn('Supabase getPublishedDocuments error:', error);
+  }
+
+  return [];
 }
 
 /**
  * Fetch all documents for Admin (including drafts)
  */
 export async function getAllDocuments() {
-  const cached = getCachedDocuments();
-  const isSeeded = localStorage.getItem(SEEDED_KEY);
-
   try {
     const { data, error } = await supabase
       .from('document_templates')
@@ -391,53 +405,13 @@ export async function getAllDocuments() {
       .order('created_at', { ascending: false });
 
     if (!error && Array.isArray(data)) {
-      if (data.length === 0 && !isSeeded && (!cached || cached.length === 0)) {
-        // Table exists in Supabase but has 0 rows: try auto-seeding
-        const toSeed = filterOutDeleted(RMUTSV_DEFAULT_DOCUMENTS);
-        if (toSeed.length > 0) {
-          try {
-            await supabase.from('document_templates').insert(toSeed);
-          } catch (e) {
-            console.warn('Auto-seed documents to Supabase skipped:', e);
-          }
-        }
-        localStorage.setItem(SEEDED_KEY, 'true');
-        setCachedDocuments(toSeed);
-        return toSeed;
-      }
-
-      // Filter out deleted from remote data
-      const cleanRemote = filterOutDeleted(data);
-
-      // Merge with any locally added/updated documents that aren't in Supabase
-      if (cached && cached.length > 0) {
-        const remoteIds = new Set(cleanRemote.map((r) => r.id));
-        const localOnly = cached.filter((c) => !remoteIds.has(c.id));
-        const merged = [...cleanRemote, ...localOnly];
-        setCachedDocuments(merged);
-        localStorage.setItem(SEEDED_KEY, 'true');
-        return merged;
-      }
-
-      setCachedDocuments(cleanRemote);
-      localStorage.setItem(SEEDED_KEY, 'true');
-      return cleanRemote;
+      return data;
+    }
+    if (error) {
+      console.warn('Error fetching all document templates from Supabase:', error);
     }
   } catch (error) {
-    console.warn('Using fallback RMUTSV all document templates:', error);
-  }
-
-  // Fallback to cache if available
-  if (cached !== null) {
-    return filterOutDeleted(cached);
-  }
-
-  // First time initialization if never seeded
-  if (!isSeeded) {
-    localStorage.setItem(SEEDED_KEY, 'true');
-    const defaults = filterOutDeleted(RMUTSV_DEFAULT_DOCUMENTS);
-    setCachedDocuments(defaults);
-    return defaults;
+    console.warn('Supabase getAllDocuments error:', error);
   }
 
   return [];
@@ -470,6 +444,7 @@ export async function createDocument(docData, fileObj = null, previewImgFiles = 
   const primaryPreviewUrl = previewUrls[0] || null;
 
   const newDoc = {
+    id: generateUuid(),
     title: docData.title.trim(),
     category: docData.category || 'แบบฟอร์มทั่วไป',
     description: docData.description?.trim() || '',
@@ -487,28 +462,18 @@ export async function createDocument(docData, fileObj = null, previewImgFiles = 
     updated_at: new Date().toISOString(),
   };
 
-  try {
-    const { data, error } = await supabase
-      .from('document_templates')
-      .insert([newDoc])
-      .select()
-      .single();
+  const { data, error } = await supabase
+    .from('document_templates')
+    .insert([newDoc])
+    .select()
+    .single();
 
-    if (!error && data) {
-      // update cache
-      const current = getCachedDocuments() || RMUTSV_DEFAULT_DOCUMENTS;
-      setCachedDocuments([data, ...current]);
-      return data;
-    }
-    throw error || new Error('Insert returned no data');
-  } catch (err) {
-    console.warn('Supabase create failed, persisting in local storage:', err);
-    const localId = generateUuid();
-    const savedDoc = { ...newDoc, id: localId };
-    const current = getCachedDocuments() || RMUTSV_DEFAULT_DOCUMENTS;
-    setCachedDocuments([savedDoc, ...current]);
-    return savedDoc;
+  if (error) {
+    console.error('Supabase createDocument failed:', error);
+    throw error;
   }
+
+  return data;
 }
 
 /**
@@ -558,29 +523,19 @@ export async function updateDocument(
     payload.preview_image_url = currentImages[0] || null;
   }
 
-  if (isUuid(actualId)) {
-    try {
-      const { data, error } = await supabase
-        .from('document_templates')
-        .update(payload)
-        .eq('id', actualId)
-        .select()
-        .single();
+  const { data, error } = await supabase
+    .from('document_templates')
+    .update(payload)
+    .eq('id', actualId)
+    .select()
+    .single();
 
-      if (!error && data) {
-        const current = getCachedDocuments() || RMUTSV_DEFAULT_DOCUMENTS;
-        setCachedDocuments(current.map((d) => (d.id === id || d.id === actualId ? data : d)));
-        return data;
-      }
-    } catch (err) {
-      console.warn('Supabase update failed, updating local cache:', err);
-    }
+  if (error) {
+    console.error('Supabase updateDocument failed:', error);
+    throw error;
   }
 
-  const current = getCachedDocuments() || RMUTSV_DEFAULT_DOCUMENTS;
-  const updatedList = current.map((d) => (d.id === id || d.id === actualId ? { ...d, ...payload, id: actualId } : d));
-  setCachedDocuments(updatedList);
-  return { id: actualId, ...payload };
+  return data;
 }
 
 /**
@@ -589,18 +544,7 @@ export async function updateDocument(
 export async function deleteDocument(id, fileUrl = null, previewImages = null) {
   const actualId = LEGACY_ID_MAP[id] || id;
 
-  // 1. Permanently record in deleted IDs to prevent fallback rebirth
-  markDeletedId(id);
-  markDeletedId(actualId);
-  localStorage.setItem(SEEDED_KEY, 'true');
-
-  // 2. Update local cache immediately
-  const cached = getCachedDocuments();
-  const current = cached !== null ? cached : filterOutDeleted(RMUTSV_DEFAULT_DOCUMENTS);
-  const remaining = current.filter((d) => d.id !== id && d.id !== actualId);
-  setCachedDocuments(remaining);
-
-  // 3. Delete files if present
+  // 1. Delete storage files if present
   try {
     if (fileUrl && fileUrl.includes(DOC_FILES_BUCKET)) {
       const parts = fileUrl.split(`/storage/v1/object/public/${DOC_FILES_BUCKET}/`);
@@ -609,13 +553,19 @@ export async function deleteDocument(id, fileUrl = null, previewImages = null) {
     if (previewImages) {
       await deletePreviewImages(previewImages);
     }
+  } catch (storageErr) {
+    console.warn('Storage cleanup warning:', storageErr);
+  }
 
-    if (isUuid(actualId)) {
-      const { error } = await supabase.from('document_templates').delete().eq('id', actualId);
-      if (error && error.code !== '22P02') console.warn('Supabase delete error:', error);
-    }
-  } catch (e) {
-    console.warn('Supabase deleteDocument failed (continuing with local deletion):', e);
+  // 2. Delete row from Supabase
+  const { error } = await supabase
+    .from('document_templates')
+    .delete()
+    .eq('id', actualId);
+
+  if (error) {
+    console.error('Supabase deleteDocument failed:', error);
+    throw error;
   }
 
   return true;
@@ -629,17 +579,22 @@ export async function incrementDocumentDownload(docId) {
 
   if (isUuid(actualId)) {
     try {
-      await supabase.rpc('increment_document_download', { doc_id: actualId });
+      const { data } = await supabase
+        .from('document_templates')
+        .select('download_count')
+        .eq('id', actualId)
+        .single();
+
+      if (data) {
+        await supabase
+          .from('document_templates')
+          .update({ download_count: (data.download_count || 0) + 1 })
+          .eq('id', actualId);
+      }
     } catch {
-      // Fallback
+      // Ignore background counter errors
     }
   }
-
-  // Fallback in-memory / cache update
-  const current = getCachedDocuments() || RMUTSV_DEFAULT_DOCUMENTS;
-  setCachedDocuments(
-    current.map((d) => (d.id === docId || d.id === actualId ? { ...d, download_count: (d.download_count || 0) + 1 } : d))
-  );
 }
 
 /**
