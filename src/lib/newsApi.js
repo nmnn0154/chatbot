@@ -231,17 +231,30 @@ export async function deleteNewsImage(publicUrl) {
  * Fetch all published news (for users)
  */
 export async function getPublishedNews() {
-  const all = await getAllNews();
-  return all.filter((n) => n.is_published !== false);
+  try {
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('*')
+      .eq('is_published', true)
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      return data;
+    }
+    if (error) {
+      console.warn('Error fetching published news from Supabase:', error);
+    }
+  } catch (error) {
+    console.warn('Supabase getPublishedNews error:', error);
+  }
+
+  return [];
 }
 
 /**
  * Fetch all news (for admins)
  */
 export async function getAllNews() {
-  const cached = getCachedNews();
-  const isSeeded = localStorage.getItem(NEWS_SEEDED_KEY);
-
   try {
     const { data, error } = await supabase
       .from('announcements')
@@ -249,51 +262,13 @@ export async function getAllNews() {
       .order('created_at', { ascending: false });
 
     if (!error && Array.isArray(data)) {
-      if (data.length === 0 && !isSeeded && (!cached || cached.length === 0)) {
-        // Initial auto-seed default items
-        localStorage.setItem(NEWS_SEEDED_KEY, 'true');
-        const toSeed = filterOutDeletedNews(RMUTSV_DEFAULT_NEWS);
-        try {
-          await supabase.from('announcements').insert(toSeed);
-        } catch (e) {
-          console.warn('Auto-seed news to Supabase skipped:', e);
-        }
-        setCachedNews(toSeed);
-        return toSeed;
-      }
-
-      // Filter out deleted from remote data
-      const cleanRemote = filterOutDeletedNews(data);
-
-      // Merge with locally created/modified items so they are not wiped out
-      if (cached && cached.length > 0) {
-        const remoteIds = new Set(cleanRemote.map((r) => r.id));
-        const localOnly = cached.filter((c) => !remoteIds.has(c.id));
-        const merged = [...cleanRemote, ...localOnly];
-        setCachedNews(merged);
-        localStorage.setItem(NEWS_SEEDED_KEY, 'true');
-        return merged;
-      }
-
-      setCachedNews(cleanRemote);
-      localStorage.setItem(NEWS_SEEDED_KEY, 'true');
-      return cleanRemote;
+      return data;
+    }
+    if (error) {
+      console.warn('Error fetching all news from Supabase:', error);
     }
   } catch (error) {
-    console.warn('Using cached RMUTSV news:', error);
-  }
-
-  // Fallback to local cache if present
-  if (cached !== null) {
-    return filterOutDeletedNews(cached);
-  }
-
-  // First time initialization
-  if (!isSeeded) {
-    localStorage.setItem(NEWS_SEEDED_KEY, 'true');
-    const defaults = filterOutDeletedNews(RMUTSV_DEFAULT_NEWS);
-    setCachedNews(defaults);
-    return defaults;
+    console.warn('Supabase getAllNews error:', error);
   }
 
   return [];
