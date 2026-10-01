@@ -326,8 +326,100 @@ export function clearAllChatHistory(userId = null) {
   }
 }
 
+// ==========================================
+// KNOWLEDGE BASE DOCUMENTS & PDF MANAGEMENT
+// ==========================================
+
+const DOC_STORAGE_BUCKET = 'document-files';
+const KNOWLEDGE_META_STORAGE_KEY = 'rmutsv_knowledge_doc_meta';
+
+function getDocMetaFallbacks() {
+  try {
+    const raw = localStorage.getItem(KNOWLEDGE_META_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDocMetaFallback(docId, meta) {
+  try {
+    if (!docId || !meta) return;
+    const current = getDocMetaFallbacks();
+    current[docId] = {
+      ...current[docId],
+      file_url: meta.publicUrl || meta.fileUrl || meta.file_url || null,
+      file_size: meta.fileSize || meta.file_size || null,
+      file_type: meta.fileType || meta.file_type || 'PDF',
+    };
+    localStorage.setItem(KNOWLEDGE_META_STORAGE_KEY, JSON.stringify(current));
+  } catch (e) {
+    console.warn('Failed to save document metadata fallback:', e);
+  }
+}
+
+function removeDocMetaFallback(docId) {
+  try {
+    const current = getDocMetaFallbacks();
+    if (current[docId]) {
+      delete current[docId];
+      localStorage.setItem(KNOWLEDGE_META_STORAGE_KEY, JSON.stringify(current));
+    }
+  } catch (e) {
+    console.warn('Failed to remove document metadata fallback:', e);
+  }
+}
+
+export function formatDocFileSize(bytes) {
+  if (!bytes || bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
 /**
- * Get all document references (for admin)
+ * Upload a PDF or document file to Supabase Storage (document-files bucket)
+ */
+export async function uploadKnowledgeFileToStorage(file) {
+  try {
+    const fileExt = (file.name.split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '') || 'pdf';
+    // Storage keys must be ASCII only. Remove non-ASCII characters (such as Thai script) to avoid "Invalid key" error
+    const rawBase = file.name.replace(/\.[^/.]+$/, '');
+    const asciiOnly = rawBase.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_').slice(0, 30);
+    const safeBase = asciiOnly.replace(/^_+|_+$/g, '') || 'doc';
+    const fileName = `knowledge_${Date.now()}_${safeBase}.${fileExt}`;
+    const contentType = file.type || (fileExt === 'pdf' ? 'application/pdf' : 'application/octet-stream');
+
+    const { error: uploadError } = await supabase.storage
+      .from(DOC_STORAGE_BUCKET)
+      .upload(fileName, file, { contentType, cacheControl: '3600', upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage.from(DOC_STORAGE_BUCKET).getPublicUrl(fileName);
+    return {
+      publicUrl: data.publicUrl,
+      fileName: file.name,
+      fileSize: formatDocFileSize(file.size),
+      fileType: fileExt.toUpperCase(),
+      storagePath: fileName,
+    };
+  } catch (error) {
+    console.warn('Knowledge file storage upload failed:', error);
+    // Return metadata without crashing; publicUrl is null so large base64 strings do not cause HTTP 500 in Postgres
+    return {
+      publicUrl: null,
+      fileName: file.name,
+      fileSize: formatDocFileSize(file.size),
+      fileType: (file.name.split('.').pop() || 'PDF').toUpperCase(),
+      storagePath: null,
+    };
+  }
+}
+
+/**
+ * Get all document references (for admin) with metadata enrichment
  */
 export async function getDocuments(searchQuery = '') {
   let query = supabase
@@ -341,33 +433,101 @@ export async function getDocuments(searchQuery = '') {
 
   const { data, error } = await query;
   if (error) throw error;
-  return data;
+
+  // Enrich with local cache in case file_url column was just added or offline
+  const metaCache = getDocMetaFallbacks();
+  const enriched = (data || []).map((doc) => {
+    const cached = metaCache[doc.id] || {};
+    return {
+      ...doc,
+      file_url: doc.file_url || cached.file_url || null,
+      file_size: doc.file_size || cached.file_size || null,
+      file_type: doc.file_type || cached.file_type || (doc.filename?.toLowerCase().endsWith('.pdf') ? 'PDF' : 'TEXT'),
+    };
+  });
+
+  return enriched;
 }
 
 /**
- * Upload and process a document (metadata and chunks)
+ * Get chunks of a specific document for previewing AI indexing
  */
-export async function uploadDocument(filename, uploaderId, chunksData) {
-  // 1. Insert Document record
-  const { data: docData, error: docError } = await supabase
+export async function getDocumentChunks(documentId) {
+  try {
+    const { data, error } = await supabase
+      .from('document_chunks')
+      .select('id, content, created_at')
+      .eq('document_id', documentId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error('Failed to get document chunks:', err);
+    return [];
+  }
+}
+
+/**
+ * Upload and process a document (metadata, optional PDF storage, and vector chunks)
+ */
+export async function uploadDocument(filename, uploaderId, chunksData, meta = {}) {
+  // 1. Insert Document record with file metadata (supports migration 011 and graceful fallback)
+  let docData;
+  const insertPayload = {
+    filename,
+    uploaded_by: uploaderId,
+  };
+
+  const fileUrl = meta.publicUrl || meta.file_url;
+  if (fileUrl && typeof fileUrl === 'string' && fileUrl.startsWith('http')) {
+    insertPayload.file_url = fileUrl;
+  }
+  if (meta.fileSize || meta.file_size) {
+    insertPayload.file_size = String(meta.fileSize || meta.file_size);
+  }
+  if (meta.fileType || meta.file_type) {
+    insertPayload.file_type = String(meta.fileType || meta.file_type);
+  }
+
+  const { data, error: docError } = await supabase
     .from('documents')
-    .insert({ filename, uploaded_by: uploaderId })
+    .insert(insertPayload)
     .select()
     .single();
 
-  if (docError) throw docError;
+  if (docError) {
+    console.warn('documents insert with metadata had an issue, falling back to base insert:', docError.message || docError);
+    const fallbackRes = await supabase
+      .from('documents')
+      .insert({ filename, uploaded_by: uploaderId })
+      .select()
+      .single();
+
+    if (fallbackRes.error) {
+      console.error('Document insert fallback error:', fallbackRes.error);
+      throw new Error(fallbackRes.error.message || 'ไม่สามารถบันทึกเอกสารลงฐานข้อมูลได้');
+    }
+    docData = fallbackRes.data;
+  } else {
+    docData = data;
+  }
 
   const docId = docData.id;
 
-  // 2. Insert Chunks
-  // Because generating embeddings takes time and can limit out, we process in small batches if necessary.
-  
-  // Actually, chunksData should already contain the vectors, or we generate embeddings here.
-  // We assume chunksData is an array of strings.
-  
+  // Cache metadata locally as redundancy
+  if (meta && (meta.publicUrl || meta.file_url || meta.fileSize)) {
+    saveDocMetaFallback(docId, {
+      fileUrl: meta.publicUrl || meta.file_url,
+      fileSize: meta.fileSize || meta.file_size,
+      fileType: meta.fileType || meta.file_type || 'PDF',
+    });
+  }
+
+  // 2. Insert Chunks and vectors
   const chunks = [];
-  const BATCH_SIZE = 5; // process 5 chunks per embedding request to avoid sending too large payload
-  
+  const BATCH_SIZE = 5;
+
   for (let i = 0; i < chunksData.length; i += BATCH_SIZE) {
     const batch = chunksData.slice(i, i + BATCH_SIZE);
     try {
@@ -376,13 +536,12 @@ export async function uploadDocument(filename, uploaderId, chunksData) {
         chunks.push({
           document_id: docId,
           content: batch[j],
-          // Store vector array exactly as pgvector expects '[val, val, val]'
-          embedding: `[${embeddings[j].join(',')}]` 
+          embedding: `[${embeddings[j].join(',')}]`,
         });
       }
-    } catch(err) {
-      console.error("Batch embedding error", err);
-      throw new Error("Failed to generate embeddings for document chunks");
+    } catch (err) {
+      console.error('Batch embedding error', err);
+      throw new Error('Failed to generate embeddings for document chunks');
     }
   }
 
@@ -392,24 +551,246 @@ export async function uploadDocument(filename, uploaderId, chunksData) {
     .insert(chunks);
 
   if (chunkError) {
-    // rollback document creation
     await deleteDocument(docId);
     throw chunkError;
   }
 
-  return docData;
+  return {
+    ...docData,
+    file_url: docData.file_url || meta.publicUrl || meta.file_url || null,
+    file_size: docData.file_size || meta.fileSize || meta.file_size || null,
+    file_type: docData.file_type || meta.fileType || meta.file_type || 'PDF',
+  };
 }
 
 /**
- * Delete a document and its chunks (cascade)
+ * Delete a document, its chunks, and its storage file
  */
-export async function deleteDocument(id) {
+export async function deleteDocument(id, fileUrl = null) {
+  // 1. Delete storage file if present
+  if (fileUrl && fileUrl.includes(`/storage/v1/object/public/${DOC_STORAGE_BUCKET}/`)) {
+    try {
+      const parts = fileUrl.split(`/storage/v1/object/public/${DOC_STORAGE_BUCKET}/`);
+      if (parts[1]) {
+        await supabase.storage.from(DOC_STORAGE_BUCKET).remove([parts[1]]);
+      }
+    } catch (storageErr) {
+      console.warn('Storage file cleanup warning:', storageErr);
+    }
+  }
+
+  // 2. Delete database record (chunks cascade delete)
   const { error } = await supabase
     .from('documents')
     .delete()
     .eq('id', id);
 
   if (error) throw error;
+
+  // 3. Clear local cache
+  removeDocMetaFallback(id);
+}
+
+/**
+ * Download a PDF document file or trigger official printable view
+ */
+export async function downloadKnowledgePdf(doc) {
+  if (doc.file_url) {
+    // If it's a data URL or blob
+    if (doc.file_url.startsWith('data:') || doc.file_url.startsWith('blob:')) {
+      const a = document.createElement('a');
+      a.href = doc.file_url;
+      a.download = doc.filename.toLowerCase().endsWith('.pdf') ? doc.filename : `${doc.filename}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+
+    try {
+      const response = await fetch(doc.file_url);
+      if (!response.ok) throw new Error('Fetch failed');
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = doc.filename.toLowerCase().endsWith('.pdf') ? doc.filename : `${doc.filename}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      return;
+    } catch (err) {
+      console.warn('Blob download fallback, opening file directly:', err);
+      const a = document.createElement('a');
+      a.href = doc.file_url;
+      a.target = '_blank';
+      a.download = doc.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+  }
+
+  // If no file_url, fetch chunks and open printable/PDF view
+  const chunks = await getDocumentChunks(doc.id);
+  printOrSaveKnowledgeAsPdf(doc, chunks);
+}
+
+/**
+ * Print or Save as PDF for document text chunks
+ */
+export function printOrSaveKnowledgeAsPdf(doc, chunks = []) {
+  const sanitize = (str) =>
+    String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+  const contentHtml = chunks.length > 0
+    ? chunks
+        .map(
+          (c, idx) => `
+        <div style="margin-bottom: 20px; padding: 14px 18px; background: #f8fafc; border-left: 4px solid #0284c7; border-radius: 6px; page-break-inside: avoid;">
+          <div style="font-weight: 700; font-size: 13px; color: #0284c7; margin-bottom: 6px;">ส่วนที่ ${idx + 1}</div>
+          <div style="font-size: 14px; line-height: 1.8; color: #1e293b; white-space: pre-wrap;">${sanitize(c.content)}</div>
+        </div>
+      `
+        )
+        .join('')
+    : '<div style="padding: 20px; text-align: center; color: #64748b;">ไม่มีข้อมูลเนื้อหาในเอกสารนี้</div>';
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('กรุณาอนุญาตป๊อปอัป (Popup) เพื่อดูตัวอย่างพิมพ์และบันทึก PDF');
+    return;
+  }
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="th">
+    <head>
+      <meta charset="utf-8">
+      <title>${sanitize(doc.filename)} - กยศ. มทร.ศรีวิชัย</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+      <style>
+        * { box-sizing: border-box; }
+        body {
+          font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          padding: 32px;
+          color: #0f172a;
+          margin: 0 auto;
+          max-width: 900px;
+          background: #ffffff;
+        }
+        .header-bar {
+          text-align: center;
+          border-bottom: 2px solid #0284c7;
+          padding-bottom: 16px;
+          margin-bottom: 24px;
+        }
+        .inst-title {
+          font-size: 20px;
+          font-weight: 700;
+          color: #0f172a;
+          margin-bottom: 4px;
+        }
+        .inst-sub {
+          font-size: 13px;
+          color: #475569;
+        }
+        .title-card {
+          background: #f0f9ff;
+          border: 1px solid #bae6fd;
+          border-radius: 8px;
+          padding: 18px 20px;
+          margin-bottom: 24px;
+        }
+        .doc-title {
+          font-size: 18px;
+          font-weight: 700;
+          color: #0369a1;
+          margin: 0 0 8px 0;
+        }
+        .doc-meta {
+          font-size: 12px;
+          color: #64748b;
+          display: flex;
+          gap: 20px;
+          flex-wrap: wrap;
+        }
+        .action-bar {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 24px;
+          padding-bottom: 16px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .btn {
+          padding: 8px 16px;
+          font-size: 13px;
+          border-radius: 6px;
+          font-weight: 600;
+          cursor: pointer;
+          border: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .btn-primary { background: #0284c7; color: white; }
+        .btn-primary:hover { background: #0369a1; }
+        .btn-secondary { background: #e2e8f0; color: #1e293b; }
+        .footer-note {
+          margin-top: 32px;
+          padding-top: 16px;
+          border-top: 1px solid #e2e8f0;
+          font-size: 11px;
+          color: #94a3b8;
+          text-align: center;
+        }
+        @media print {
+          .action-bar { display: none !important; }
+          body { padding: 0; }
+          .title-card { border: 1px solid #cbd5e1; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="action-bar">
+        <button class="btn btn-primary" onclick="window.print()">
+          🖨️ พิมพ์ / บันทึกเป็น PDF (Save as PDF)
+        </button>
+        <button class="btn btn-secondary" onclick="window.close()">
+          ปิดหน้าต่าง
+        </button>
+      </div>
+
+      <div class="header-bar">
+        <div class="inst-title">มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย (สงขลา)</div>
+        <div class="inst-sub">งานแนะแนวและทุนการศึกษา กองพัฒนานักศึกษา | ระบบฐานข้อมูลองค์ความรู้ AI (กยศ.)</div>
+      </div>
+
+      <div class="title-card">
+        <h1 class="doc-title">${sanitize(doc.filename)}</h1>
+        <div class="doc-meta">
+          <span>📅 วันที่นำเข้าสู่ระบบ: ${new Date(doc.created_at || Date.now()).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+          <span>📑 จำนวนส่วนข้อมูล AI: ${chunks.length} ส่วน</span>
+          <span>🔒 สถานะ: ใช้งานในฐานข้อมูล AI แชทบอท</span>
+        </div>
+      </div>
+
+      <div>${contentHtml}</div>
+
+      <div class="footer-note">
+        * เอกสารนี้จัดทำขึ้นโดยระบบสารสนเทศกองทุนเงินให้กู้ยืมเพื่อการศึกษา (กยศ.) มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย *
+      </div>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
 }
 
 /**

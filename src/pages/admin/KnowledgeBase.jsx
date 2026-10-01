@@ -1,10 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import Tesseract from 'tesseract.js';
 import {
   getDocuments,
   uploadDocument,
   deleteDocument,
+  uploadKnowledgeFileToStorage,
+  downloadKnowledgePdf,
+  getDocumentChunks,
+  printOrSaveKnowledgeAsPdf,
+  formatDocFileSize,
 } from '../../lib/chatApi';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -19,6 +24,13 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
+  Eye,
+  Download,
+  ExternalLink,
+  Printer,
+  Copy,
+  CheckCheck,
+  Layers,
 } from 'lucide-react';
 
 /* ─── กยศ. Preset Knowledge Data (มทร.ศรีวิชัย สงขลา) ───────────── */
@@ -473,8 +485,11 @@ export default function KnowledgeBase() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('all'); // 'all' | 'pdf' | 'text'
   const [showModal, setShowModal] = useState(false);
   const [showPreset, setShowPreset] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -500,11 +515,46 @@ export default function KnowledgeBase() {
     setTimeout(() => setToast(null), 4000);
   }
 
+  const stats = useMemo(() => {
+    const total = documents.length;
+    const pdfs = documents.filter(
+      (d) => d.file_type === 'PDF' || d.filename?.toLowerCase().endsWith('.pdf') || !!d.file_url
+    ).length;
+    const texts = total - pdfs;
+    return { total, pdfs, texts };
+  }, [documents]);
+
+  const filteredDocuments = useMemo(() => {
+    return documents.filter((doc) => {
+      const isPdf = doc.file_type === 'PDF' || doc.filename?.toLowerCase().endsWith('.pdf') || !!doc.file_url;
+      if (filterType === 'pdf' && !isPdf) return false;
+      if (filterType === 'text' && isPdf) return false;
+      return true;
+    });
+  }, [documents, filterType]);
+
+  async function handleDownloadDoc(doc, e) {
+    if (e) e.stopPropagation();
+    try {
+      setDownloadingId(doc.id);
+      await downloadKnowledgePdf(doc);
+      showToast('กำลังดาวน์โหลดเอกสาร...');
+    } catch (error) {
+      console.error('Download error:', error);
+      showToast('ไม่สามารถดาวน์โหลดเอกสารได้', 'error');
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
   async function handleDelete() {
     if (!deleteTarget) return;
     try {
-      await deleteDocument(deleteTarget.id);
+      await deleteDocument(deleteTarget.id, deleteTarget.file_url);
       showToast('ลบเอกสารสำเร็จ');
+      if (viewingDoc?.id === deleteTarget.id) {
+        setViewingDoc(null);
+      }
       setDeleteTarget(null);
       loadDocuments();
     } catch (error) {
@@ -523,30 +573,91 @@ export default function KnowledgeBase() {
 
   return (
     <div className="page-container animate-fade-in" id="knowledge-base-page">
-      <div className="page-header">
-        <h1>จัดการเอกสารฐานความรู้</h1>
-        <p>เพิ่มเนื้อหาจากไฟล์ PDF/ข้อความ หรือวางข้อความเอง เพื่อใช้เป็นแหล่งข้อมูลของแชทบอท</p>
+      <div className="page-header" style={{ marginBottom: '1.25rem' }}>
+        <h1>จัดการเอกสารฐานความรู้ AI</h1>
+        <p>เพิ่มเนื้อหาจากไฟล์ PDF/ข้อความ หรือวางข้อความ เพื่อใช้เป็นแหล่งข้อมูล RAG ของแชทบอท สามารถเปิดดูและดาวน์โหลดไฟล์ต้นฉบับได้</p>
       </div>
 
-      <div className="toolbar">
-        <div className="search-input-wrapper">
-          <Search size={18} />
-          <input
-            type="text"
-            className="input"
-            placeholder="ค้นหาชื่อเอกสาร..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      {/* ── Overview Stats Cards ── */}
+      <div className="kb-stats-grid">
+        <div className="kb-stat-card">
+          <div className="kb-stat-icon" style={{ background: '#e0f2fe', color: '#0369a1' }}>
+            <FileText size={22} />
+          </div>
+          <div>
+            <div className="kb-stat-val">{stats.total}</div>
+            <div className="kb-stat-label">เอกสารฐานความรู้ทั้งหมด</div>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-          <button className="btn btn-secondary" onClick={() => setShowPreset(true)}>
-            <Sparkles size={18} />
-            นำเข้าองค์ความรู้ กยศ.
+
+        <div className="kb-stat-card">
+          <div className="kb-stat-icon" style={{ background: '#fee2e2', color: '#be123c' }}>
+            <FileText size={22} />
+          </div>
+          <div>
+            <div className="kb-stat-val">{stats.pdfs}</div>
+            <div className="kb-stat-label">ไฟล์ PDF ต้นฉบับ (เปิดดู/ดาวน์โหลด)</div>
+          </div>
+        </div>
+
+        <div className="kb-stat-card">
+          <div className="kb-stat-icon" style={{ background: '#fef3c7', color: '#b45309' }}>
+            <Sparkles size={22} />
+          </div>
+          <div>
+            <div className="kb-stat-val">{stats.texts}</div>
+            <div className="kb-stat-label">พรีเซ็ต & ข้อความเวกเตอร์ AI</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Toolbar & Responsive Filter Bar ── */}
+      <div className="kb-toolbar-container">
+        <div className="kb-toolbar">
+          <div className="search-input-wrapper kb-search-box">
+            <Search size={18} />
+            <input
+              type="text"
+              className="input"
+              placeholder="ค้นหาชื่อเอกสาร..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="kb-actions-group">
+            <button className="btn btn-secondary" onClick={() => setShowPreset(true)}>
+              <Sparkles size={16} />
+              นำเข้าองค์ความรู้ กยศ.
+            </button>
+            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+              <Upload size={16} />
+              เพิ่มเอกสาร
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Pills */}
+        <div className="kb-filter-pills">
+          <button
+            type="button"
+            className={`kb-filter-pill ${filterType === 'all' ? 'active' : ''}`}
+            onClick={() => setFilterType('all')}
+          >
+            ทั้งหมด ({stats.total})
           </button>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <Upload size={18} />
-            เพิ่มเอกสาร
+          <button
+            type="button"
+            className={`kb-filter-pill ${filterType === 'pdf' ? 'active' : ''}`}
+            onClick={() => setFilterType('pdf')}
+          >
+            เฉพาะไฟล์ PDF ({stats.pdfs})
+          </button>
+          <button
+            type="button"
+            className={`kb-filter-pill ${filterType === 'text' ? 'active' : ''}`}
+            onClick={() => setFilterType('text')}
+          >
+            เฉพาะข้อความ / พรีเซ็ต ({stats.texts})
           </button>
         </div>
       </div>
@@ -555,10 +666,10 @@ export default function KnowledgeBase() {
         <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-3xl)' }}>
           <div className="spinner"></div>
         </div>
-      ) : documents.length === 0 ? (
+      ) : filteredDocuments.length === 0 ? (
         <div className="empty-state">
           <BookOpen size={48} />
-          <p>ไม่พบเอกสารในระบบ</p>
+          <p>{documents.length === 0 ? 'ไม่พบเอกสารในระบบ' : 'ไม่พบเอกสารตามเงื่อนไขที่เลือก'}</p>
           <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
             <Upload size={16} />
             อัปโหลดเอกสารใหม่
@@ -571,36 +682,114 @@ export default function KnowledgeBase() {
               <thead>
                 <tr>
                   <th>ชื่อเอกสาร</th>
-                  <th style={{ width: '150px' }}>วันที่อัปโหลด</th>
-                  <th style={{ width: '90px' }}>จัดการ</th>
+                  <th style={{ width: '130px' }}>รูปแบบ</th>
+                  <th className="kb-table-col-date" style={{ width: '130px' }}>วันที่อัปโหลด</th>
+                  <th style={{ width: '125px', textAlign: 'center' }}>จัดการ</th>
                 </tr>
               </thead>
               <tbody>
-                {documents.map((doc) => (
-                  <tr key={doc.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500 }}>
-                        <FileText size={18} color="var(--color-brand-primary)" />
-                        {doc.filename}
-                      </div>
-                    </td>
-                    <td style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                      {formatDate(doc.created_at)}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
-                        <button
-                          className="btn btn-ghost btn-icon btn-sm"
-                          onClick={() => setDeleteTarget(doc)}
-                          title="ลบ"
-                          style={{ color: 'var(--color-brand-rose)' }}
+                {filteredDocuments.map((doc) => {
+                  const isPdf = doc.file_type === 'PDF' || doc.filename?.toLowerCase().endsWith('.pdf');
+                  const hasFile = !!doc.file_url;
+                  return (
+                    <tr
+                      key={doc.id}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setViewingDoc(doc)}
+                    >
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: '8px',
+                              background: isPdf ? '#fee2e2' : '#e0f2fe',
+                              color: isPdf ? '#b91c1c' : '#0284c7',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              marginTop: '2px',
+                            }}
+                          >
+                            <FileText size={16} />
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div className="kb-doc-title">
+                              {doc.filename}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <span>{hasFile ? 'มีไฟล์ต้นฉบับ' : 'เนื้อหาพรีเซ็ต/ข้อความ'}</span>
+                              <span>• {formatDate(doc.created_at)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span
+                            style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              padding: '2px 7px',
+                              borderRadius: '12px',
+                              background: isPdf ? '#fee2e2' : '#e0f2fe',
+                              color: isPdf ? '#b91c1c' : '#0284c7',
+                              border: `1px solid ${isPdf ? '#fca5a5' : '#bae6fd'}`,
+                            }}
+                          >
+                            {isPdf ? 'PDF' : 'TEXT'}
+                          </span>
+                          {doc.file_size && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                              {doc.file_size}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="kb-table-col-date" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                        {formatDate(doc.created_at)}
+                      </td>
+                      <td>
+                        <div
+                          style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <button
+                            type="button"
+                            className="kb-table-action-btn view"
+                            onClick={() => setViewingDoc(doc)}
+                            title="ดูเอกสาร / ตรวจสอบเนื้อหา AI"
+                          >
+                            <Eye size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            className="kb-table-action-btn download"
+                            onClick={(e) => handleDownloadDoc(doc, e)}
+                            title="ดาวน์โหลด PDF"
+                            disabled={downloadingId === doc.id}
+                          >
+                            {downloadingId === doc.id ? (
+                              <div className="spinner" style={{ width: 13, height: 13, borderWidth: 2 }} />
+                            ) : (
+                              <Download size={15} />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className="kb-table-action-btn delete"
+                            onClick={() => setDeleteTarget(doc)}
+                            title="ลบเอกสาร"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -612,6 +801,15 @@ export default function KnowledgeBase() {
         <div style={{ textAlign: 'center', padding: 'var(--space-md)', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
           แสดงผลทั้งหมด {documents.length} รายการ
         </div>
+      )}
+
+      {/* Document View & Download Modal */}
+      {viewingDoc && (
+        <DocumentViewModal
+          doc={viewingDoc}
+          onClose={() => setViewingDoc(null)}
+          onDownload={(d) => handleDownloadDoc(d)}
+        />
       )}
 
       {/* Upload Modal */}
@@ -834,12 +1032,12 @@ function UploadModal({ userId, onSuccess, onClose }) {
     setFile(selected);
   };
 
-  async function processChunks(name, textChunks) {
+  async function processChunks(name, textChunks, meta = {}) {
     if (textChunks.length === 0) {
       throw new Error('ไม่มีเนื้อหาให้ประมวลผล');
     }
     setProgressText(`กำลังสร้างเวกเตอร์และบันทึก (${textChunks.length} ส่วน)...`);
-    await uploadDocument(name, userId, textChunks);
+    await uploadDocument(name, userId, textChunks, meta);
     onSuccess();
   }
 
@@ -852,12 +1050,26 @@ function UploadModal({ userId, onSuccess, onClose }) {
       setProcessing(true);
       setErrorMsg('');
 
+      let fileMeta = null;
+      if (!isTextFile(file)) {
+        setProgressText('กำลังอัปโหลดไฟล์ PDF ต้นฉบับขึ้นระบบคลาวด์...');
+        try {
+          fileMeta = await uploadKnowledgeFileToStorage(file);
+        } catch (storageErr) {
+          console.warn('Storage upload error (continuing with text extraction):', storageErr);
+        }
+      }
+
       let text;
       if (isTextFile(file)) {
         setProgressText('กำลังอ่านไฟล์ข้อความ...');
         text = await file.text();
+        fileMeta = {
+          fileType: (file.name.split('.').pop() || 'TXT').toUpperCase(),
+          fileSize: formatDocFileSize(file.size),
+        };
       } else {
-        setProgressText('กำลังอ่านไฟล์ PDF...');
+        setProgressText('กำลังอ่านเนื้อหาไฟล์ PDF...');
         text = await extractTextFromPDF(file);
       }
 
@@ -870,10 +1082,11 @@ function UploadModal({ userId, onSuccess, onClose }) {
       }
 
       setProgressText('กำลังแบ่งส่วนย่อยของเนื้อหา...');
-      await processChunks(file.name, chunkText(text));
+      await processChunks(file.name, chunkText(text), fileMeta || {});
     } catch (err) {
       console.error('Processing error:', err);
-      setErrorMsg(err.message);
+      const message = err?.message || (typeof err === 'string' ? err : 'เกิดข้อผิดพลาดในการประมวลผลไฟล์');
+      setErrorMsg(message);
       setProcessing(false);
     }
   };
@@ -924,7 +1137,10 @@ function UploadModal({ userId, onSuccess, onClose }) {
       setProcessing(true);
       setErrorMsg('');
       setProgressText('กำลังแบ่งส่วนย่อยของเนื้อหา...');
-      await processChunks(title, chunkText(body));
+      await processChunks(title, chunkText(body), {
+        fileType: 'TEXT',
+        fileSize: `${body.length.toLocaleString()} ตัวอักษร`,
+      });
     } catch (err) {
       console.error('Processing error:', err);
       setErrorMsg(err.message);
@@ -1082,6 +1298,393 @@ function UploadModal({ userId, onSuccess, onClose }) {
             disabled={processing || (mode === 'file' ? !file : !pasteText.trim())}
           >
             {processing ? 'กำลังดำเนินการ...' : 'ประมวลผลและบันทึก'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- Document View & PDF Viewer Modal Component ---- */
+function DocumentViewModal({ doc, onClose, onDownload }) {
+  const [activeTab, setActiveTab] = useState(doc.file_url ? 'pdf' : 'chunks');
+  const [chunks, setChunks] = useState([]);
+  const [loadingChunks, setLoadingChunks] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const [searchChunk, setSearchChunk] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const isPdf = doc.file_type === 'PDF' || doc.filename?.toLowerCase().endsWith('.pdf');
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadChunks() {
+      setLoadingChunks(true);
+      try {
+        const data = await getDocumentChunks(doc.id);
+        if (mounted) setChunks(data || []);
+      } catch (e) {
+        console.error('Failed to load chunks:', e);
+      } finally {
+        if (mounted) setLoadingChunks(false);
+      }
+    }
+    loadChunks();
+    return () => {
+      mounted = false;
+    };
+  }, [doc.id]);
+
+  const allText = chunks.map((c) => c.content).join('\n\n');
+
+  const handleCopyAll = async () => {
+    try {
+      await navigator.clipboard.writeText(allText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error('Copy failed:', e);
+    }
+  };
+
+  const handleDownloadClick = async () => {
+    try {
+      setIsDownloading(true);
+      await onDownload(doc);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handlePrint = () => {
+    printOrSaveKnowledgeAsPdf(doc, chunks);
+  };
+
+  const filteredChunks = chunks.filter((c) =>
+    !searchChunk ? true : c.content.toLowerCase().includes(searchChunk.toLowerCase())
+  );
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 1100 }}>
+      <div
+        className="modal kb-view-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="modal-header" style={{ alignItems: 'flex-start', paddingBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ flex: '1 1 240px', minWidth: 0, paddingRight: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  background: isPdf ? '#fee2e2' : '#e0f2fe',
+                  color: isPdf ? '#b91c1c' : '#0284c7',
+                  border: `1px solid ${isPdf ? '#fca5a5' : '#bae6fd'}`,
+                }}
+              >
+                {isPdf ? 'PDF' : 'TEXT'}
+              </span>
+              {doc.file_size && (
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  {doc.file_size}
+                </span>
+              )}
+              {chunks.length > 0 && (
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    background: 'var(--color-bg-tertiary)',
+                    color: 'var(--color-text-secondary)',
+                  }}
+                >
+                  <Layers size={11} style={{ display: 'inline', marginRight: 3, verticalAlign: -1 }} />
+                  {chunks.length} ส่วนเวกเตอร์ AI
+                </span>
+              )}
+            </div>
+            <h2
+              style={{
+                fontSize: 'var(--text-lg)',
+                margin: 0,
+                color: 'var(--color-text-primary)',
+                wordBreak: 'break-word',
+              }}
+            >
+              {doc.filename}
+            </h2>
+          </div>
+
+          <div className="kb-modal-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {doc.file_url && (
+              <a
+                href={doc.file_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary btn-sm"
+                title="เปิดในแท็บใหม่"
+                style={{ fontSize: '0.75rem', padding: '6px 10px', height: 'auto' }}
+              >
+                <ExternalLink size={14} />
+                <span>เปิดแท็บใหม่</span>
+              </a>
+            )}
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={handleDownloadClick}
+              disabled={isDownloading}
+              style={{ fontSize: '0.75rem', padding: '6px 12px', height: 'auto' }}
+            >
+              {isDownloading ? (
+                <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
+              ) : (
+                <Download size={14} />
+              )}
+              <span>ดาวน์โหลด PDF</span>
+            </button>
+            <button className="btn btn-ghost btn-icon btn-sm" onClick={onClose} title="ปิด">
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        {doc.file_url && (
+          <div
+            style={{
+              display: 'flex',
+              gap: '8px',
+              padding: '0 1.25rem',
+              borderBottom: '1px solid var(--color-border)',
+              background: 'var(--color-bg-secondary)',
+              overflowX: 'auto',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setActiveTab('pdf')}
+              style={{
+                padding: '10px 14px',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 600,
+                border: 'none',
+                borderBottom: `2px solid ${activeTab === 'pdf' ? 'var(--color-primary)' : 'transparent'}`,
+                background: 'none',
+                color: activeTab === 'pdf' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <FileText size={16} />
+              ดูไฟล์ PDF ต้นฉบับ
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('chunks')}
+              style={{
+                padding: '10px 14px',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 600,
+                border: 'none',
+                borderBottom: `2px solid ${activeTab === 'chunks' ? 'var(--color-primary)' : 'transparent'}`,
+                background: 'none',
+                color: activeTab === 'chunks' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Sparkles size={16} />
+              เนื้อหาเวกเตอร์ AI ({chunks.length})
+            </button>
+          </div>
+        )}
+
+        {/* Modal Body */}
+        <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.25rem' }}>
+          {activeTab === 'pdf' && doc.file_url ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div className="kb-pdf-container">
+                <iframe
+                  src={`${doc.file_url}#toolbar=1&navpanes=0`}
+                  title={doc.filename}
+                  width="100%"
+                  height="100%"
+                  style={{ border: 'none', display: 'block' }}
+                />
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--color-text-muted)',
+                  padding: '2px 4px',
+                  flexWrap: 'wrap',
+                  gap: '6px',
+                }}
+              >
+                <span>💡 หากโปรแกรมเบราว์เซอร์ไม่แสดงตัวอย่าง PDF ให้กดปุ่ม "เปิดแท็บใหม่" หรือ "ดาวน์โหลด PDF"</span>
+                <a
+                  href={doc.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}
+                >
+                  เปิดเต็มหน้าจอ ↗
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Chunks control bar */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 200px', minWidth: '180px' }}>
+                  <Search size={16} style={{ color: 'var(--color-text-muted)' }} />
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="ค้นหาข้อความในส่วนข้อมูล AI..."
+                    value={searchChunk}
+                    onChange={(e) => setSearchChunk(e.target.value)}
+                    style={{ height: '32px', fontSize: 'var(--text-xs)', padding: '0 8px' }}
+                  />
+                  {searchChunk && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setSearchChunk('')}
+                      style={{ fontSize: '0.7rem', padding: '2px 6px' }}
+                    >
+                      ล้าง
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleCopyAll}
+                    style={{ fontSize: '0.75rem', gap: '4px' }}
+                    title="คัดลอกข้อความทั้งหมด"
+                  >
+                    {copied ? <CheckCheck size={14} color="#059669" /> : <Copy size={14} />}
+                    {copied ? 'คัดลอกแล้ว!' : 'คัดลอกทั้งหมด'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handlePrint}
+                    style={{ fontSize: '0.75rem', gap: '4px' }}
+                    title="เปิดหน้าต่างพิมพ์และบันทึกเป็น PDF"
+                  >
+                    <Printer size={14} />
+                    พิมพ์ / บันทึก PDF
+                  </button>
+                </div>
+              </div>
+
+              {/* Chunks List */}
+              {loadingChunks ? (
+                <div style={{ textAlign: 'center', padding: '2.5rem' }}>
+                  <div className="spinner" style={{ margin: '0 auto 12px', width: 28, height: 28, borderWidth: 3 }} />
+                  <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>กำลังโหลดส่วนข้อมูล AI...</p>
+                </div>
+              ) : chunks.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--color-text-muted)' }}>
+                  <BookOpen size={36} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
+                  <p style={{ fontSize: 'var(--text-sm)' }}>ไม่พบส่วนเนื้อหาเวกเตอร์ในเอกสารนี้</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>แสดง {filteredChunks.length} จาก {chunks.length} ส่วน</span>
+                    <span>รวมประมาณ {allText.length.toLocaleString()} ตัวอักษร</span>
+                  </div>
+
+                  {filteredChunks.map((chunk, idx) => (
+                    <div
+                      key={chunk.id || idx}
+                      style={{
+                        padding: '12px 14px',
+                        borderRadius: 'var(--radius-md)',
+                        background: '#ffffff',
+                        border: '1px solid var(--color-border)',
+                        boxShadow: 'var(--shadow-sm)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          borderBottom: '1px dashed var(--color-border)',
+                          paddingBottom: '6px',
+                          fontSize: '0.75rem',
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+                          ส่วนที่ {idx + 1}
+                        </span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>
+                          {(chunk.content || '').length} ตัวอักษร
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 'var(--text-sm)',
+                          color: 'var(--color-text-primary)',
+                          lineHeight: 1.7,
+                          whiteSpace: 'pre-wrap',
+                          maxHeight: '220px',
+                          overflowY: 'auto',
+                        }}
+                      >
+                        {chunk.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="modal-footer" style={{ justifyContent: 'space-between', padding: '0.875rem 1.25rem' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+            ฐานข้อมูล AI มทร.ศรีวิชัย (สงขลา)
+          </div>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>
+            ปิด
           </button>
         </div>
       </div>

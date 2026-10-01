@@ -2268,4 +2268,228 @@ select.input {
   opacity: 0.95 !important;
 }
 
+/* =====================================================
+   Knowledge Base Admin Page Responsive & Modern Styling
+   ===================================================== */
+.kb-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 1.25rem;
+}
+
+.kb-stat-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.kb-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.kb-stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kb-stat-val {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--color-text-primary);
+}
+
+.kb-stat-label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-top: 3px;
+}
+
+.kb-toolbar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 1.25rem;
+}
+
+.kb-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.kb-search-box {
+  flex: 1 1 260px;
+  position: relative;
+}
+
+.kb-actions-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.kb-filter-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.kb-filter-pill {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.kb-filter-pill:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.kb-filter-pill.active {
+  background: var(--color-primary);
+  color: #ffffff;
+  border-color: var(--color-primary);
+}
+
+.kb-table-action-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.kb-table-action-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-hover);
+}
+
+.kb-table-action-btn.view:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.kb-table-action-btn.download:hover {
+  color: #0284c7;
+  border-color: #0284c7;
+  background: #e0f2fe;
+}
+
+.kb-table-action-btn.delete:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+/* Modal Responsive Classes */
+.kb-view-modal {
+  width: 95%;
+  max-width: 960px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.kb-pdf-container {
+  width: 100%;
+  height: clamp(340px, 60vh, 660px);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: #334155;
+}
+
+/* Mobile & Tablet Breakpoints */
+@media (max-width: 820px) {
+  .kb-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .kb-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .kb-stat-card {
+    padding: 0.75rem 1rem;
+  }
+  .kb-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .kb-search-box {
+    width: 100%;
+    min-width: 100%;
+  }
+  .kb-actions-group {
+    width: 100%;
+  }
+  .kb-actions-group .btn {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+    font-size: 0.75rem;
+    padding: 8px 10px;
+  }
+  .kb-table-col-date {
+    display: none !important;
+  }
+  .kb-pdf-container {
+    height: 52vh;
+  }
+  .kb-modal-header-actions {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .kb-actions-group .btn {
+    flex: 1 1 100%;
+  }
+  .kb-view-modal {
+    width: 98%;
+    max-height: 96vh;
+    margin: 8px auto;
+  }
+  .kb-pdf-container {
+    height: 48vh;
+  }
+}
+
+
 
