@@ -154,8 +154,8 @@ export default function AdminDocuments() {
     setIsPublished(doc.is_published !== false);
     setSortOrder(doc.sort_order || 0);
     setDocFile(null);
-    setDocFileName(doc.file_name || '');
-    setDocFileSize(doc.file_size || '');
+    setDocFileName(doc.file_url ? (doc.file_name || '') : '');
+    setDocFileSize(doc.file_url ? (doc.file_size || '') : '');
     setRemoveDocFile(false);
 
     let initialImages = [];
@@ -259,8 +259,8 @@ export default function AdminDocuments() {
             guide_notes: guideNotes,
             is_published: isPublished,
             sort_order: Number(sortOrder) || 0,
-            file_name: docFileName,
-            file_size: docFileSize,
+            file_name: docFile ? docFileName : null,
+            file_size: docFile ? docFileSize : null,
             preview_images: existingPreviewImages,
           },
           docFile,
@@ -281,7 +281,7 @@ export default function AdminDocuments() {
           docFile,
           filesToUpload,
           existingPreviewImages,
-          removeDocFile
+          removeDocFile || (!docFile && !targetDoc.file_url)
         );
         showToast('แก้ไขข้อมูลเอกสารสำเร็จ');
       }
@@ -619,28 +619,53 @@ export default function AdminDocuments() {
                     </td>
 
                     <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                          {doc.file_name || 'เอกสารเปล่า (.PDF)'}
-                        </span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                          {doc.file_type || 'PDF'} • {doc.file_size || '250 KB'}
-                        </span>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => downloadDocumentFile(doc)}
-                          style={{
-                            padding: '2px 4px',
-                            justifyContent: 'flex-start',
-                            fontSize: '0.7rem',
-                            color: 'var(--color-primary)',
-                            gap: '4px',
-                          }}
-                        >
-                          <Download size={12} /> ทดสอบโหลด
-                        </button>
-                      </div>
+                      {doc.file_url ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                            {doc.file_name || 'ไฟล์เอกสาร'}
+                          </span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                            {doc.file_type || 'PDF'} • {doc.file_size || ''}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => downloadDocumentFile(doc)}
+                            style={{
+                              padding: '2px 4px',
+                              justifyContent: 'flex-start',
+                              fontSize: '0.7rem',
+                              color: 'var(--color-primary)',
+                              gap: '4px',
+                            }}
+                          >
+                            <Download size={12} /> ทดสอบโหลด
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <span
+                            style={{
+                              fontSize: '0.7rem',
+                              padding: '2px 8px',
+                              borderRadius: 'var(--radius-sm)',
+                              background: 'var(--color-bg-secondary)',
+                              color: 'var(--color-text-muted)',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              width: 'fit-content',
+                              border: '1px dashed var(--color-border)',
+                            }}
+                          >
+                            ไม่มีไฟล์ดาวน์โหลด
+                          </span>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
+                            (เฉพาะตัวอย่างการกรอก)
+                          </span>
+                        </div>
+                      )}
                     </td>
 
                     <td style={{ textAlign: 'center' }}>
@@ -865,8 +890,9 @@ export default function AdminDocuments() {
                     border: '1px dashed var(--color-border)',
                   }}
                 >
-                  <label style={{ fontWeight: 700, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                  <label style={{ fontWeight: 700, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
                     <FileUp size={16} /> ไฟล์เอกสารจริงสำหรับให้นักศึกษาดาวน์โหลด (.PDF / .DOCX)
+                    <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--color-text-muted)' }}>(ไม่บังคับ - แนบเฉพาะเมื่อมีแบบฟอร์มเปล่า)</span>
                   </label>
 
                   <input
@@ -918,8 +944,10 @@ export default function AdminDocuments() {
                       <Upload size={16} /> คลิกเพื่อเลือกไฟล์เอกสาร (.PDF หรือ .DOCX)
                     </button>
                   )}
-                  <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                    * หากไม่ได้แนบไฟล์ ระบบจะสร้างแบบฟอร์มทางการมาตรฐานให้อัตโนมัติเมื่อนักศึกษากดดาวน์โหลด
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '6px', lineHeight: 1.5 }}>
+                    💡 <strong>หมายเหตุ:</strong> ไม่จำเป็นต้องแนบไฟล์หากรายการนี้เป็นเพียง <em>"ตัวอย่างการกรอก"</em> หรือ <em>"รูปภาพตัวอย่าง"</em>
+                    <br />
+                    (หากไม่ได้แนบไฟล์ ระบบจะไม่สร้างไฟล์มั่ว และจะแสดงสถานะว่ามีเฉพาะตัวอย่างการกรอกเท่านั้น)
                   </div>
                 </div>
 

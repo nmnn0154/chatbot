@@ -368,6 +368,20 @@ export function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+export function normalizeDoc(doc) {
+  if (!doc) return doc;
+  const hasFile = Boolean(
+    doc.file_url && typeof doc.file_url === 'string' && doc.file_url.startsWith('http')
+  );
+  return {
+    ...doc,
+    file_url: hasFile ? doc.file_url : null,
+    file_name: hasFile ? doc.file_name : null,
+    file_size: hasFile ? doc.file_size : null,
+    file_type: hasFile ? doc.file_type : null,
+  };
+}
+
 /**
  * Fetch published documents for general students/users
  */
@@ -381,7 +395,7 @@ export async function getPublishedDocuments() {
       .order('created_at', { ascending: false });
 
     if (!error && Array.isArray(data)) {
-      return data;
+      return data.map(normalizeDoc);
     }
     if (error) {
       console.warn('Error fetching published document templates from Supabase:', error);
@@ -405,7 +419,7 @@ export async function getAllDocuments() {
       .order('created_at', { ascending: false });
 
     if (!error && Array.isArray(data)) {
-      return data;
+      return data.map(normalizeDoc);
     }
     if (error) {
       console.warn('Error fetching all document templates from Supabase:', error);
@@ -443,21 +457,26 @@ export async function createDocument(docData, fileObj = null, previewImgFiles = 
 
   const primaryPreviewUrl = previewUrls[0] || null;
 
+  const hasFile = Boolean(
+    fileInfo.publicUrl ||
+    (docData.file_url && typeof docData.file_url === 'string' && docData.file_url.startsWith('http'))
+  );
+
   const newDoc = {
     id: generateUuid(),
     title: docData.title.trim(),
     category: docData.category || 'แบบฟอร์มทั่วไป',
     description: docData.description?.trim() || '',
     guide_notes: docData.guide_notes?.trim() || '',
-    file_url: fileInfo.publicUrl || docData.file_url || null,
-    file_name: fileInfo.fileName || docData.file_name || `${docData.title.replace(/\s+/g, '_')}.pdf`,
-    file_size: fileInfo.fileSize || docData.file_size || '250 KB',
-    file_type: fileInfo.fileType || docData.file_type || 'PDF',
+    file_url: hasFile ? (fileInfo.publicUrl || docData.file_url) : null,
+    file_name: hasFile ? (fileInfo.fileName || docData.file_name || null) : null,
+    file_size: hasFile ? (fileInfo.fileSize || docData.file_size || null) : null,
+    file_type: hasFile ? (fileInfo.fileType || docData.file_type || null) : null,
     preview_image_url: primaryPreviewUrl,
     preview_images: previewUrls,
     download_count: 0,
     is_published: docData.is_published !== false,
-    sort_order: docData.sort_order || 0,
+    sort_order: Number(docData.sort_order) || 0,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -473,7 +492,7 @@ export async function createDocument(docData, fileObj = null, previewImgFiles = 
     throw error;
   }
 
-  return data;
+  return normalizeDoc(data);
 }
 
 /**
@@ -500,6 +519,7 @@ export async function updateDocument(
     payload.file_url = null;
     payload.file_name = null;
     payload.file_size = null;
+    payload.file_type = null;
   }
 
   // Handle preview images
@@ -535,7 +555,7 @@ export async function updateDocument(
     throw error;
   }
 
-  return data;
+  return normalizeDoc(data);
 }
 
 /**
@@ -600,12 +620,13 @@ export async function incrementDocumentDownload(docId) {
 /**
  * Download a real document file:
  * - If file_url is a real URL, triggers browser download
- * - If file_url is null or placeholder, generates a high quality official PDF document for real-world usage!
+ * - If file_url is null or empty, does NOT fabricate any fake file.
  */
 export function downloadDocumentFile(doc) {
-  incrementDocumentDownload(doc.id);
+  if (!doc) return false;
 
-  if (doc.file_url && doc.file_url.startsWith('http')) {
+  if (doc.file_url && typeof doc.file_url === 'string' && doc.file_url.startsWith('http')) {
+    incrementDocumentDownload(doc.id);
     const a = document.createElement('a');
     a.href = doc.file_url;
     a.download = doc.file_name || `${doc.title}.pdf`;
@@ -613,63 +634,10 @@ export function downloadDocumentFile(doc) {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    return;
+    return true;
   }
 
-  // Generate an official document file for direct real usage
-  generateOfficialPdfFile(doc);
+  console.warn('Cannot download: document has no attached file:', doc.title);
+  return false;
 }
 
-/**
- * Generate a printable, usable official document blob / PDF
- */
-function generateOfficialPdfFile(doc) {
-  const content = `
-================================================================================
-                    มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย
-             งานแนะแนวและทุนการศึกษา กองพัฒนานักศึกษา (กยศ.)
-================================================================================
-
-ชื่อเอกสาร: ${doc.title}
-หมวดหมู่: ${doc.category || 'แบบฟอร์มทั่วไป'}
-วันที่จัดทำ: ${new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}
-
---------------------------------------------------------------------------------
-1. รายละเอียดและวัตถุประสงค์ของเอกสาร:
-${doc.description || '-'}
-
---------------------------------------------------------------------------------
-2. ข้อแนะนำและจุดที่ต้องระวังในการกรอกเอกสาร:
-${doc.guide_notes ? doc.guide_notes.replace(/[*#]/g, '') : '-'}
-
---------------------------------------------------------------------------------
-3. ข้อมูลผู้กู้ยืมเงิน กยศ.
-ชื่อ-นามสกุล: ............................................................................
-รหัสนักศึกษา: ........................................ คณะ/สาขา: .................................
-เบอร์โทรศัพท์: ....................................... วันที่ยื่นเอกสาร: ...../...../.........
-
---------------------------------------------------------------------------------
-4. ส่วนสำหรับเจ้าหน้าที่รับเอกสาร
-[ ] ตรวจสอบความถูกต้องของเอกสารเรียบร้อย
-[ ] ลงลายมือชื่อครบถ้วน
-[ ] แนบหลักฐานประกอบครบตามเกณฑ์
-
-ลงชื่อเจ้าหน้าที่ผู้ตรวจ: .................................................
-(................................................................)
-ตำแหน่ง: ................................................................
-วันที่: ...../...../.........
-================================================================================
-* เอกสารนี้ออกโดยระบบ กยศ. Chatbot มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย *
-`;
-
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const fileName = doc.file_name ? doc.file_name.replace(/\.pdf$/i, '.txt') : `${doc.title}.txt`;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}

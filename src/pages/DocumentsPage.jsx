@@ -60,14 +60,17 @@ export default function DocumentsPage() {
 
   const handleDownload = (e, doc) => {
     e.stopPropagation();
-    downloadDocumentFile(doc);
-    showSuccess('เริ่มดาวน์โหลดไฟล์แล้ว', doc.title || 'เอกสาร กยศ.', 1500);
-    // Optimistically update local download count
-    setDocuments((prev) =>
-      prev.map((d) =>
-        d.id === doc.id ? { ...d, download_count: (d.download_count || 0) + 1 } : d
-      )
-    );
+    if (!doc.file_url) return;
+    const success = downloadDocumentFile(doc);
+    if (success) {
+      showSuccess('เริ่มดาวน์โหลดไฟล์แล้ว', doc.title || 'เอกสาร กยศ.', 1500);
+      // Optimistically update local download count
+      setDocuments((prev) =>
+        prev.map((d) =>
+          d.id === doc.id ? { ...d, download_count: (d.download_count || 0) + 1 } : d
+        )
+      );
+    }
   };
 
   return (
@@ -366,21 +369,39 @@ export default function DocumentsPage() {
                     }
                     return null;
                   })()}
-                  <span
-                    style={{
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
-                      padding: '2px 6px',
-                      borderRadius: 'var(--radius-sm)',
-                      background: '#fee2e2',
-                      color: '#b91c1c',
-                    }}
-                  >
-                    {doc.file_type || 'PDF'}
-                  </span>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                    {doc.file_size || '250 KB'}
-                  </span>
+                  {doc.file_url ? (
+                    <>
+                      <span
+                        style={{
+                          fontSize: '0.65rem',
+                          fontWeight: 700,
+                          padding: '2px 6px',
+                          borderRadius: 'var(--radius-sm)',
+                          background: '#fee2e2',
+                          color: '#b91c1c',
+                        }}
+                      >
+                        {doc.file_type || 'PDF'}
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                        {doc.file_size || ''}
+                      </span>
+                    </>
+                  ) : (
+                    <span
+                      style={{
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'var(--color-bg-secondary)',
+                        color: 'var(--color-text-muted)',
+                        border: '1px dashed var(--color-border)',
+                      }}
+                    >
+                      เฉพาะตัวอย่าง
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -446,31 +467,39 @@ export default function DocumentsPage() {
                     color: 'var(--color-text-muted)',
                   }}
                 >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <Download size={12} /> ดาวน์โหลดแล้ว {(doc.download_count || 0).toLocaleString()} ครั้ง
-                  </span>
+                  {doc.file_url ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Download size={12} /> ดาวน์โหลดแล้ว {(doc.download_count || 0).toLocaleString()} ครั้ง
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--color-text-muted)' }}>
+                      ดูแนวทางการกรอก
+                    </span>
+                  )}
                   <span>มทร.ศรีวิชัย</span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: doc.file_url ? '1fr 1fr' : '1fr', gap: '8px' }}>
                   <button
                     type="button"
-                    className="btn btn-secondary btn-sm"
+                    className={`btn ${doc.file_url ? 'btn-secondary' : 'btn-primary'} btn-sm`}
                     onClick={() => setPreviewDoc(doc)}
                     style={{ fontSize: 'var(--text-xs)', gap: '4px', justifyContent: 'center' }}
                   >
                     <Eye size={14} />
                     ดูตัวอย่างการกรอก
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={(e) => handleDownload(e, doc)}
-                    style={{ fontSize: 'var(--text-xs)', gap: '4px', justifyContent: 'center' }}
-                  >
-                    <Download size={14} />
-                    โหลดไฟล์จริง
-                  </button>
+                  {doc.file_url && (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={(e) => handleDownload(e, doc)}
+                      style={{ fontSize: 'var(--text-xs)', gap: '4px', justifyContent: 'center' }}
+                    >
+                      <Download size={14} />
+                      โหลดไฟล์จริง
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

@@ -32,6 +32,7 @@ export default function DocumentSampleViewer({ document: doc, onClose }) {
   if (!doc) return null;
 
   const handleDownload = () => {
+    if (!doc?.file_url) return;
     downloadDocumentFile(doc);
   };
 
@@ -97,7 +98,9 @@ export default function DocumentSampleViewer({ document: doc, onClose }) {
                   {doc.category}
                 </span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                  {doc.file_type || 'PDF'} • {doc.file_size || '250 KB'}
+                  {doc.file_url 
+                    ? `${doc.file_type || 'PDF'} • ${doc.file_size || ''}`
+                    : 'เฉพาะตัวอย่างการกรอก (ไม่มีไฟล์ดาวน์โหลด)'}
                 </span>
               </div>
               <h2
@@ -123,15 +126,17 @@ export default function DocumentSampleViewer({ document: doc, onClose }) {
               <Printer size={16} />
               <span className="hidden-mobile">พิมพ์</span>
             </button>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={handleDownload}
-              style={{ gap: '6px' }}
-            >
-              <Download size={16} />
-              <span>ดาวน์โหลดเอกสารจริง</span>
-            </button>
+            {doc.file_url && (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={handleDownload}
+                style={{ gap: '6px' }}
+              >
+                <Download size={16} />
+                <span>ดาวน์โหลดเอกสารจริง</span>
+              </button>
+            )}
             <button
               type="button"
               className="btn btn-ghost btn-icon"
@@ -474,21 +479,25 @@ export default function DocumentSampleViewer({ document: doc, onClose }) {
           }}
         >
           <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-            💡 ดาวน์โหลดแบบฟอร์มฉบับเต็มเพื่อนำไปพิมพ์และกรอกส่งกองพัฒนานักศึกษา อาคาร 7
+            {doc.file_url
+              ? '💡 ดาวน์โหลดแบบฟอร์มฉบับเต็มเพื่อนำไปพิมพ์และกรอกส่งกองพัฒนานักศึกษา อาคาร 7'
+              : '📌 รายการนี้สำหรับดูตัวอย่างการกรอกและคำแนะนำเท่านั้น (ไม่มีไฟล์แบบฟอร์มสำหรับดาวน์โหลด)'}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button type="button" className="btn btn-secondary" onClick={onClose}>
               ปิด
             </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleDownload}
-              style={{ gap: '6px' }}
-            >
-              <Download size={16} />
-              ดาวน์โหลดเอกสารจริง ({doc.file_size || '250 KB'})
-            </button>
+            {doc.file_url && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleDownload}
+                style={{ gap: '6px' }}
+              >
+                <Download size={16} />
+                ดาวน์โหลดเอกสารจริง ({doc.file_size || ''})
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -686,29 +695,12 @@ function SampleDocumentPaper({ doc }) {
             {doc.description || 'แบบฟอร์มอย่างเป็นทางการสำหรับการดำเนินงานกองทุนเงินให้กู้ยืมเพื่อการศึกษา มทร.ศรีวิชัย'}
           </p>
 
-          <div style={{ border: '1px solid #e2e8f0', padding: '1rem', borderRadius: 6, background: '#fafafa', marginBottom: '1rem' }}>
-            <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: '6px' }}>
-              ส่วนที่ 1: ข้อมูลผู้ยื่นคำร้อง
+          <div style={{ border: '1px solid #e2e8f0', padding: '1.25rem', borderRadius: 8, background: '#fafafa', marginBottom: '1rem' }}>
+            <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: '8px', fontSize: '0.9rem' }}>
+              📌 แนวทางและคำแนะนำในการกรอกเอกสาร
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.8rem' }}>
-              <div>ชื่อ-นามสกุล: <span style={{ color: '#1d4ed8', fontWeight: 600 }}>นายทดสอบ ตัวอย่าง</span></div>
-              <div>รหัสประจำตัว: <span style={{ color: '#1d4ed8', fontWeight: 600 }}>6710200000</span></div>
-              <div>คณะ: <span style={{ color: '#1d4ed8', fontWeight: 600 }}>วิศวกรรมศาสตร์</span></div>
-              <div>โทรศัพท์: <span style={{ color: '#1d4ed8', fontWeight: 600 }}>081-234-5678</span></div>
-            </div>
-          </div>
-
-          <div style={{ border: '1px solid #e2e8f0', padding: '1rem', borderRadius: 6, background: '#fafafa' }}>
-            <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: '6px' }}>
-              ส่วนที่ 2: ลายมือชื่อและการตรวจสอบ
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
-              <div>
-                ลงชื่อ: <span style={{ color: '#1d4ed8', fontStyle: 'italic', fontWeight: 700 }}>ทดสอบ ตัวอย่าง</span> ผู้ยื่นคำขอ
-              </div>
-              <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#64748b' }}>
-                ลงวันที่: 1 กรกฎาคม 2568
-              </div>
+            <div style={{ fontSize: '0.85rem', color: '#334155', whiteSpace: 'pre-line', lineHeight: 1.6 }}>
+              {doc.guide_notes || 'กรุณาตรวจสอบรายละเอียดและข้อควรระวังในการกรอกตามระเบียบของกองทุน กยศ. มทร.ศรีวิชัย'}
             </div>
           </div>
         </div>
