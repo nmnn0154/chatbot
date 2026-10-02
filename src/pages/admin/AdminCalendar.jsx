@@ -179,22 +179,22 @@ export default function AdminCalendar() {
 
       {(mode === 'add' || mode === 'edit') && (
         <div className="modal-backdrop" onClick={() => !submitting && setMode(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', width: '94%', maxHeight: '90vh' }}>
             <div className="modal-header">
               <h2>{mode === 'add' ? 'เพิ่มกำหนดการ' : 'แก้ไขกำหนดการ'}</h2>
               {!submitting && <button className="btn btn-ghost btn-icon" onClick={() => setMode(null)}><X size={20} /></button>}
             </div>
-            <form onSubmit={handleSave}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <form onSubmit={handleSave} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div className="modal-body" style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '1.125rem', padding: '1.25rem 1.5rem' }}>
                 <div className="form-group">
                   <label className="form-label">หัวข้อ *</label>
                   <input className="input" value={form.title} onChange={setField('title')} required placeholder="เช่น เปิดระบบยื่นกู้ ภาคเรียนที่ 1/2568 (รายเก่า)" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">รายละเอียด</label>
-                  <textarea className="input" rows={3} value={form.description} onChange={setField('description')} />
+                  <textarea className="input" rows={3} value={form.description} onChange={setField('description')} placeholder="รายละเอียดเพิ่มเติมเกี่ยวกับกำหนดการ..." />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="modal-grid-2">
                   <div className="form-group">
                     <label className="form-label">หมวด</label>
                     <select className="input" value={form.category} onChange={setField('category')}>
@@ -217,17 +217,37 @@ export default function AdminCalendar() {
                   </div>
                   <div className="form-group">
                     <label className="form-label">วันที่เริ่ม *</label>
-                    <input type="date" className="input" value={form.start_date} onChange={setField('start_date')} required />
+                    <input
+                      type="date"
+                      className="input"
+                      value={form.start_date}
+                      onChange={setField('start_date')}
+                      required
+                      style={{ minHeight: '44px', height: '44px', WebkitAppearance: 'none' }}
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label">วันที่สิ้นสุด</label>
-                    <input type="date" className="input" value={form.end_date} onChange={setField('end_date')} />
+                    <input
+                      type="date"
+                      className="input"
+                      value={form.end_date}
+                      onChange={setField('end_date')}
+                      style={{ minHeight: '44px', height: '44px', WebkitAppearance: 'none' }}
+                    />
                   </div>
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-sm)' }}>
-                  <input type="checkbox" checked={form.is_published} onChange={setField('is_published')} />
-                  เผยแพร่ให้ผู้ใช้และแชทบอทเห็น
-                </label>
+                <div style={{ paddingTop: '0.25rem' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', fontSize: 'var(--text-sm)', cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={form.is_published}
+                      onChange={setField('is_published')}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                    <span>เผยแพร่ให้ผู้ใช้และแชทบอทเห็น</span>
+                  </label>
+                </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setMode(null)} disabled={submitting}>ยกเลิก</button>

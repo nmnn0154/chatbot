@@ -364,7 +364,7 @@ export default function AdminFaq() {
       {/* Add/Edit Modal */}
       {(modalMode === 'add' || modalMode === 'edit') && (
         <div className="modal-backdrop" onClick={() => !submitting && setModalMode(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '94%', maxHeight: '90vh' }}>
             <div className="modal-header">
               <h2>{modalMode === 'add' ? 'เพิ่ม FAQ ใหม่' : 'แก้ไข FAQ'}</h2>
               {!submitting && (
@@ -373,8 +373,8 @@ export default function AdminFaq() {
                 </button>
               )}
             </div>
-            <form onSubmit={handleSave}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <form onSubmit={handleSave} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div className="modal-body" style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.5rem' }}>
                 <div className="form-group">
                   <label className="form-label">คำถาม</label>
                   <input

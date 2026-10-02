@@ -807,7 +807,7 @@ export default function AdminDocuments() {
               )}
             </div>
 
-            <form onSubmit={handleSave}>
+            <form onSubmit={handleSave} className="modal-form">
               <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
                 {/* Title */}
                 <div className="form-group">
