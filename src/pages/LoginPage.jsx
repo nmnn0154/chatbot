@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
-  const { user, signInWithGoogle, loading } = useAuth();
+  const { user, signInWithGoogle, devLogin, loading } = useAuth();
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const navigate = useNavigate();
@@ -104,6 +104,40 @@ export default function LoginPage() {
           </svg>
           {isLoggingIn ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบด้วย Google'}
         </button>
+
+        {/* Localhost Dev Quick Login */}
+        {typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
+          <div style={{
+            marginTop: '20px',
+            padding: '14px',
+            background: 'rgba(30, 58, 138, 0.05)',
+            border: '1px dashed var(--color-primary)',
+            borderRadius: 'var(--radius-lg)',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '8px' }}>
+              🛠️ โหมดทดสอบ Localhost (ไม่ต้องผ่าน Google)
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => devLogin('admin')}
+                style={{ fontSize: '0.75rem', justifyContent: 'center' }}
+              >
+                เข้าเป็น แอดมิน
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => devLogin('user')}
+                style={{ fontSize: '0.75rem', justifyContent: 'center' }}
+              >
+                เข้าเป็น นักศึกษา
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="login-footer">
           <p>
