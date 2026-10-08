@@ -50,7 +50,11 @@ export async function sendChatMessage(message, userId, history = []) {
           'Content-Type': 'application/json',
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
-        body: JSON.stringify({ message, history }),
+        body: JSON.stringify({
+          message,
+          history,
+          clientDate: new Date().toISOString(),
+        }),
       });
 
       if (!response.ok) {

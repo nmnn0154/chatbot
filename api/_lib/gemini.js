@@ -46,11 +46,77 @@ export const SYSTEM_PROMPT = `คุณคือผู้ช่วย AI ชื�
 - ตอบด้วยภาษาที่สุภาพ เป็นคำแนะนำที่ชัดเจน และจัดรูปแบบด้วย markdown (เช่น ใช้ bullet points หรือตัวหนา) เพื่อให้อ่านง่าย`;
 
 /**
- * Build the full system instruction from retrieved context chunks.
- * @param {Array<{ content?: string, answer?: string }>} contextChunks
+ * Get formatted current date & time in Thai and Western formats (Asia/Bangkok timezone).
+ * Can accept optional clientDate ISO string from browser or defaults to current server time.
  */
-export function buildSystemInstruction(contextChunks = []) {
-  let prompt = `${SYSTEM_PROMPT}\n\nข้อมูลอ้างอิงจากเอกสาร:\n`;
+export function getSystemDateContext(clientDate = null) {
+  let dateObj = new Date();
+  if (clientDate) {
+    const parsed = new Date(clientDate);
+    if (!isNaN(parsed.getTime())) {
+      dateObj = parsed;
+    }
+  }
+
+  const tz = 'Asia/Bangkok';
+  const thaiFullDate = dateObj.toLocaleDateString('th-TH', {
+    timeZone: tz,
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const thaiTime = dateObj.toLocaleTimeString('th-TH', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const thaiDay = dateObj.toLocaleDateString('th-TH', { timeZone: tz, day: 'numeric' });
+  const thaiMonth = dateObj.toLocaleDateString('th-TH', { timeZone: tz, month: 'long' });
+  const ceYear = parseInt(dateObj.toLocaleDateString('en-US', { timeZone: tz, year: 'numeric' }), 10);
+  const beYear = ceYear + 543;
+  const isoDate = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(dateObj); // YYYY-MM-DD
+
+  return {
+    isoDate,
+    thaiFullDate,
+    thaiTime,
+    thaiDay,
+    thaiMonth,
+    beYear,
+    ceYear,
+    fullDescription: `${thaiFullDate} เวลา ${thaiTime} น. (วันที่ ${thaiDay} ${thaiMonth} พ.ศ. ${beYear} / ค.ศ. ${ceYear})`,
+  };
+}
+
+/**
+ * Build the full system instruction from retrieved context chunks and current date/time.
+ * @param {Array<{ content?: string, answer?: string }>} contextChunks
+ * @param {string|Date|null} [clientDate]
+ */
+export function buildSystemInstruction(contextChunks = [], clientDate = null) {
+  const dt = getSystemDateContext(clientDate);
+
+  const dateSection = `[ข้อมูลวันเวลาปัจจุบันของระบบ (Real-Time Current Date & Time)]:
+- วันนี้คือ: ${dt.fullDescription}
+- วันที่ตามปฏิทินสากล (ISO Date): ${dt.isoDate}
+- เดือนปัจจุบัน: ${dt.thaiMonth}
+- ปีปัจจุบัน: พ.ศ. ${dt.beYear} (ค.ศ. ${dt.ceYear})
+- เขตเวลา: เวลาประเทศไทย (Asia/Bangkok, UTC+7)
+
+[ข้อกำหนดสำคัญอย่างยิ่งเรื่องการอิงวันเวลาจริง (Mandatory Real-Time Date Grounding)]:
+1. "ต้องยึดวันเวลาปัจจุบันข้างต้น (${dt.fullDescription}) เป็นความจริงของโลกปัจจุบันเสมอ": ห้ามสมมุติ จำลอง หรือมโนว่าตนเองอยู่ในเดือนอื่นหรือปีอื่น หรืออยู่ในบริบทจำลองของเอกสารเก่า
+2. "การเปรียบเทียบกำหนดการ / ปฏิทิน / กิจกรรม / กำหนดวันหมดเขต":
+   - เมื่อผู้ใช้ถามเกี่ยวกับกำหนดการ, ปฏิทิน, กิจกรรม, อะไรที่มีอยู่, หรืออะไรที่หมดเขต/ผ่านมาแล้ว: ให้ตรวจดูวัน/เดือน/ปี ของแต่ละกิจกรรมในเอกสารอ้างอิง แล้วนำมาเปรียบเทียบกับ "วันที่ปัจจุบันจริง (${dt.thaiDay} ${dt.thaiMonth} พ.ศ. ${dt.beYear})"
+   - หากวันที่หรือช่วงเวลาของกิจกรรมนั้น "ผ่านพ้นวันที่ปัจจุบันไปแล้ว" (เช่น จัดขึ้นในวันที่หรือเดือนที่ผ่านมาแล้วในปี พ.ศ. ${dt.beYear} หรือปีก่อนหน้า เช่น เดือนก่อนหน้าของปีปัจจุบัน) => ให้ระบุอย่างชัดเจนว่ากิจกรรมนั้น **"หมดเขตแล้ว"** หรือ **"ผ่านพ้นไปแล้ว"** ห้ามระบุว่าเป็นกิจกรรมที่มีอยู่หรือกำลังจะมาถึงเด็ดขาด!
+     (ตัวอย่าง: ปัจจุบันคือเดือน${dt.thaiMonth} พ.ศ. ${dt.beYear} กิจกรรมใดที่ระบุวันที่ในเดือนกันยายน ${dt.beYear} หรือมิถุนายน ${dt.beYear} ถือว่าผ่านพ้น/หมดเขตไปแล้ว)
+   - หากวันที่หรือช่วงเวลาของกิจกรรมนั้น "ยังมาไม่ถึง หรือครอบคลุมช่วงวันที่ปัจจุบัน" => จึงจะจัดเป็น **"กำหนดการที่มีอยู่ / กำลังจะมาถึง / ยังเปิดรับอยู่"**
+   - หากผู้ใช้ถามว่า "วันนี้วันที่เท่าไหร่", "ตอนนี้เดือนอะไร", "ตอนนี้ปีอะไร" หรือถามถึงเวลา ให้ตอบตรงตามวันเวลาปัจจุบันจริงที่ระบุไว้ข้างต้น
+3. สังเกตการแปลงปี พ.ศ. และ ค.ศ. (พ.ศ. ${dt.beYear} = ค.ศ. ${dt.ceYear}) อย่างถูกต้องแม่นยำ`;
+
+  let prompt = `${SYSTEM_PROMPT}\n\n${dateSection}\n\nข้อมูลอ้างอิงจากเอกสาร:\n`;
   contextChunks.forEach((c, idx) => {
     const text = c?.content || c?.answer;
     if (text) prompt += `[ส่วนที่ ${idx + 1}]:\n${text}\n\n`;
@@ -70,13 +136,14 @@ export const FALLBACK_CHAT_MODELS = [
  * @param {string} message
  * @param {Array<{ content?: string, answer?: string }>} [contextChunks]
  * @param {Array<{ role?: string, type?: string, text?: string, content?: string }>} [history]
+ * @param {string|Date|null} [clientDate]
  * @returns {Promise<string>} the model's text response
  */
-export async function generateChatResponse(message, contextChunks = [], history = []) {
+export async function generateChatResponse(message, contextChunks = [], history = [], clientDate = null) {
   const genAI = getClient();
   const primary = chatModel();
   const modelsToTry = [primary, ...FALLBACK_CHAT_MODELS.filter(m => m !== primary)];
-  const systemInstruction = buildSystemInstruction(contextChunks);
+  const systemInstruction = buildSystemInstruction(contextChunks, clientDate);
 
   // Build multi-turn contents from history + current message
   const contents = [];

@@ -42,45 +42,61 @@ function enhanceQuery(query) {
 }
 
 /**
- * Fetch upcoming published calendar events and render them as one context block.
- * The chatbot needs these to answer "ปฏิทินการดำเนินงาน" questions (scope 1.3.1).
+ * Fetch published calendar events and categorize them based on the real current date.
+ * The chatbot needs these to answer "ปฏิทินการดำเนินงาน" questions (ทั้งที่มีอยู่และที่หมดไปแล้ว).
+ * @param {any} supabase
+ * @param {string|Date|null} [clientDate]
  */
-async function fetchCalendarContext(supabase) {
+async function fetchCalendarContext(supabase, clientDate = null) {
   try {
-    const today = new Date().toISOString().slice(0, 10);
-    // 1. Try fetching upcoming published events first
-    let { data, error } = await supabase
+    let now = new Date();
+    if (clientDate) {
+      const parsed = new Date(clientDate);
+      if (!isNaN(parsed.getTime())) now = parsed;
+    }
+    const todayIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(now);
+    const todayThai = now.toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'long', year: 'numeric' });
+
+    // Fetch published events
+    const { data, error } = await supabase
       .from('calendar_events')
       .select('title, description, category, academic_year, term, borrower_type, start_date, end_date')
       .eq('is_published', true)
-      .or(`end_date.gte.${today},and(end_date.is.null,start_date.gte.${today})`)
-      .order('start_date', { ascending: true })
-      .limit(20);
-
-    // 2. If no upcoming events, fallback to the latest published events of the current/recent academic year
-    if (!data || data.length === 0) {
-      const fallback = await supabase
-        .from('calendar_events')
-        .select('title, description, category, academic_year, term, borrower_type, start_date, end_date')
-        .eq('is_published', true)
-        .order('start_date', { ascending: false })
-        .limit(10);
-      if (fallback.data && fallback.data.length > 0) {
-        data = fallback.data.reverse();
-      }
-    }
+      .order('start_date', { ascending: true });
 
     if (!data || data.length === 0) return null;
 
-    const fmt = (d) => (d ? new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
-    const lines = data.map((e) => {
+    const fmt = (d) => (d ? new Date(d).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'long', year: 'numeric' }) : '');
+
+    const upcoming = [];
+    const past = [];
+
+    for (const e of data) {
+      const end = e.end_date || e.start_date;
+      const isPast = end < todayIso;
       const range = e.end_date ? `${fmt(e.start_date)} – ${fmt(e.end_date)}` : fmt(e.start_date);
       const term = e.term ? ` ภาคเรียนที่ ${e.term}` : '';
       const year = e.academic_year ? `/${e.academic_year}` : '';
       const who = e.borrower_type && e.borrower_type !== 'ทั้งหมด' ? ` (ผู้กู้${e.borrower_type})` : '';
-      return `- [${e.category}] ${e.title}${term}${year}${who}: ${range}${e.description ? ` — ${e.description}` : ''}`;
-    });
-    return `ปฏิทินการดำเนินงาน กยศ. มทร.ศรีวิชัย (กำหนดการที่กำลังจะถึง):\n${lines.join('\n')}`;
+      const line = `- [${e.category}] ${e.title}${term}${year}${who}: ${range}${e.description ? ` — ${e.description}` : ''}`;
+
+      if (isPast) {
+        past.push(line);
+      } else {
+        upcoming.push(line);
+      }
+    }
+
+    let result = `ปฏิทินการดำเนินงาน กยศ. มทร.ศรีวิชัย (คำนวณสถานะอิงจากวันที่ปัจจุบันจริง: ${todayThai} / ${todayIso}):\n`;
+    if (upcoming.length > 0) {
+      result += `\n[กำหนดการที่มีอยู่ / กำลังดำเนินการ / กำลังจะมาถึง]:\n${upcoming.join('\n')}\n`;
+    } else {
+      result += `\n[กำหนดการที่มีอยู่ / กำลังดำเนินการ / กำลังจะมาถึง]: ขณะนี้ไม่มีกำหนดการใหม่ที่เปิดรับ\n`;
+    }
+    if (past.length > 0) {
+      result += `\n[กำหนดการที่หมดเขต / ผ่านพ้นไปแล้ว]:\n${past.join('\n')}\n`;
+    }
+    return result;
   } catch {
     return null;
   }
@@ -162,9 +178,10 @@ async function fetchCuratedContext(supabase, message) {
  *
  * @param {string} message
  * @param {string} [accessToken]
+ * @param {string|Date|null} [clientDate]
  * @returns {Promise<Array<{ document_id?: string, content: string, similarity?: number }>>}
  */
-export async function retrieveContext(message, accessToken) {
+export async function retrieveContext(message, accessToken, clientDate = null) {
   if (!supabaseUrl() || !supabaseAnonKey()) {
     console.warn('[retrieval] Supabase env not configured — skipping context lookup');
     return [];
@@ -174,7 +191,7 @@ export async function retrieveContext(message, accessToken) {
   const chunks = [];
 
   const [calendarText, curated] = await Promise.all([
-    fetchCalendarContext(supabase),
+    fetchCalendarContext(supabase, clientDate),
     fetchCuratedContext(supabase, message),
   ]);
   if (calendarText) {

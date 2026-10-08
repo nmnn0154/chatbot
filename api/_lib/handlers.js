@@ -30,9 +30,9 @@ export function isRateLimited(ip) {
 // ---- /api/chat ----------------------------------------------------------------
 
 /**
- * @param {{ message: string, history?: Array<any>, accessToken?: string }} params
+ * @param {{ message: string, history?: Array<any>, accessToken?: string, clientDate?: string }} params
  */
-export async function handleChat({ message, history = [], accessToken }) {
+export async function handleChat({ message, history = [], accessToken, clientDate }) {
   if (!message || typeof message !== 'string' || message.trim().length === 0) {
     return { status: 400, body: { error: 'Message is required and must be a non-empty string' } };
   }
@@ -51,10 +51,10 @@ export async function handleChat({ message, history = [], accessToken }) {
       }
     }
 
-    const chunks = await retrieveContext(queryForRetrieval, accessToken);
+    const chunks = await retrieveContext(queryForRetrieval, accessToken, clientDate);
 
-    // 2. Generate the grounded answer with conversation history
-    const response = await generateChatResponse(message, chunks, history);
+    // 2. Generate the grounded answer with conversation history and real-time date
+    const response = await generateChatResponse(message, chunks, history, clientDate);
 
     return {
       status: 200,

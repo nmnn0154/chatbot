@@ -16,9 +16,9 @@ export default async function handler(req, res) {
     });
   }
 
-  const { message, history } = req.body || {};
+  const { message, history, clientDate } = req.body || {};
   const accessToken = getBearerToken(req);
 
-  const { status, body } = await handleChat({ message, history, accessToken });
+  const { status, body } = await handleChat({ message, history, accessToken, clientDate });
   return res.status(status).json(body);
 }
